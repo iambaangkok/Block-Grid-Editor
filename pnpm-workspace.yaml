@@ -1,0 +1,11 @@
+# Single-app repo (not a monorepo). This file exists only to (a) satisfy pnpm 10's requirement
+# for a `packages:` field once a pnpm-workspace.yaml is present (Cloudflare builds run pnpm 10),
+# and (b) allow esbuild's postinstall script. The key changed across pnpm majors, so both are
+# carried: `allowBuilds` (pnpm 11+) and `onlyBuiltDependencies` (pnpm 10).
+packages:
+  - .
+
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild

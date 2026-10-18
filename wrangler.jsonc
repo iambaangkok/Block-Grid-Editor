@@ -1,0 +1,19 @@
+{
+  // block-grid-editor is a purely static SPA (Vite build → dist/block-grid-editor/). Deployed as
+  // a Cloudflare "Worker with Static Assets" with NO Worker script — assets only — bound to the
+  // route www.iambaangkok.dev/block-grid-editor*. The route keeps the path prefix, which is why
+  // the build emits into a `block-grid-editor/` subfolder of the assets directory.
+  //
+  // `name` must match the Worker name in the Cloudflare dashboard.
+  // `www` needs a proxied DNS record in the iambaangkok.dev zone for the route to receive traffic.
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "block-grid-editor",
+  "compatibility_date": "2025-01-01",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "www.iambaangkok.dev/block-grid-editor*", "zone_name": "iambaangkok.dev" }
+  ],
+  "assets": {
+    "directory": "./dist"
+  }
+}
