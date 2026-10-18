@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { cellBounds } from '../model/geometry'
-import type { CellKind, Dir, KeyPiece } from '../model/types'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { cellBounds, worldCells } from '../model/geometry'
+import type { CellKind, Dir, KeyPiece, Placement } from '../model/types'
 import { applyCamera, borderWidth, COLORS, drawCells, screenToWorld, type Camera } from '../render/draw'
 import { useCanvasSize } from './useCanvas'
 
@@ -10,8 +10,21 @@ import { useCanvasSize } from './useCanvas'
 
 export type Brush = { tool: 'paint'; kind: CellKind; dir: Dir } | { tool: 'erase' }
 
+/** Check evidence drawn over the editor grid. */
+export interface PieceOverlay {
+  /** Cells to flag in red (stray groups, trapped cavity cells). */
+  bad?: { x: number; y: number }[]
+  /** All notch cells of the offending concave (outlined). */
+  concave?: { x: number; y: number }[]
+  /** Its innermost notch (filled). */
+  innermost?: { x: number; y: number }[]
+  /** Copies of the piece that fill it — the witness. */
+  ghosts?: Placement[]
+}
+
 interface Props {
   piece: KeyPiece
+  overlay?: PieceOverlay | null
   brush: Brush
   /** One stroke = one undo step; `strokeId` identifies it. */
   onPaint: (x: number, y: number, op: 'paint' | 'erase' | 'rotate', strokeId: string) => void
@@ -19,8 +32,8 @@ interface Props {
 
 const MIN_SPAN = 9
 
-function fitView(piece: KeyPiece, w: number, h: number): Camera {
-  const b = cellBounds(piece.cells) ?? { minX: 0, minY: 0, maxX: 1, maxY: 1 }
+function fitView(cells: { x: number; y: number }[], w: number, h: number): Camera {
+  const b = cellBounds(cells) ?? { minX: 0, minY: 0, maxX: 1, maxY: 1 }
   const minX = Math.min(b.minX, 0) - 2
   const maxX = Math.max(b.maxX, 1) + 2
   const minY = Math.min(b.minY, 0) - 2
@@ -30,7 +43,7 @@ function fitView(piece: KeyPiece, w: number, h: number): Camera {
   return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, zoom }
 }
 
-export function PieceCanvas({ piece, brush, onPaint }: Props) {
+export function PieceCanvas({ piece, overlay, brush, onPaint }: Props) {
   const { ref, w, h, dpr } = useCanvasSize()
   const [frozen, setFrozen] = useState<Camera | null>(null)
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
@@ -43,7 +56,11 @@ export function PieceCanvas({ piece, brush, onPaint }: Props) {
     /** The first cell already had the brush's kind: tap → rotate, drag → repaint. */
     deferred: boolean
   } | null>(null)
-  const cam = frozen ?? fitView(piece, w || 1, h || 1)
+  const ghostCells = useMemo(
+    () => (overlay?.ghosts ?? []).map((g) => worldCells(piece, g)),
+    [overlay, piece],
+  )
+  const cam = frozen ?? fitView([...piece.cells, ...ghostCells.flat()], w || 1, h || 1)
 
   useLayoutEffect(() => {
     const canvas = ref.current
@@ -81,6 +98,34 @@ export function PieceCanvas({ piece, brush, onPaint }: Props) {
 
     drawCells(ctx, piece.cells, { fill: piece.fill, border: piece.border, lineWidth: borderWidth(cam.zoom) * 1.3 })
 
+    if (overlay) {
+      const px = 1 / cam.zoom
+      for (const cells of ghostCells) {
+        drawCells(ctx, cells, { fill: piece.fill, border: piece.border, lineWidth: borderWidth(cam.zoom), alpha: 0.4 })
+        ctx.save()
+        ctx.strokeStyle = COLORS.selection
+        ctx.setLineDash([4 * px, 3 * px])
+        ctx.lineWidth = 1.5 * px
+        ctx.beginPath()
+        for (const c of cells) ctx.rect(c.x + 2 * px, c.y + 2 * px, 1 - 4 * px, 1 - 4 * px)
+        ctx.stroke()
+        ctx.restore()
+      }
+      ctx.save()
+      ctx.fillStyle = 'rgba(253, 126, 20, 0.28)'
+      for (const c of overlay.innermost ?? []) ctx.fillRect(c.x, c.y, 1, 1)
+      ctx.strokeStyle = '#e8590c'
+      ctx.lineWidth = 2 * px
+      for (const c of overlay.concave ?? []) ctx.strokeRect(c.x + px, c.y + px, 1 - 2 * px, 1 - 2 * px)
+      ctx.fillStyle = 'rgba(224, 49, 49, 0.3)'
+      ctx.strokeStyle = COLORS.conflict
+      for (const c of overlay.bad ?? []) {
+        ctx.fillRect(c.x, c.y, 1, 1)
+        ctx.strokeRect(c.x + px, c.y + px, 1 - 2 * px, 1 - 2 * px)
+      }
+      ctx.restore()
+    }
+
     if (hover) {
       if (brush.tool === 'paint') {
         drawCells(ctx, [{ ...hover, kind: brush.kind, dir: brush.dir }], {
@@ -94,7 +139,7 @@ export function PieceCanvas({ piece, brush, onPaint }: Props) {
       ctx.lineWidth = 2 / cam.zoom
       ctx.strokeRect(hover.x, hover.y, 1, 1)
     }
-  }, [ref, w, h, dpr, cam, piece, hover, brush])
+  }, [ref, w, h, dpr, cam, piece, hover, brush, overlay, ghostCells])
 
   const cellAt = (e: React.PointerEvent) => {
     const rect = ref.current!.getBoundingClientRect()

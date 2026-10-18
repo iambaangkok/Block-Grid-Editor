@@ -38,6 +38,40 @@ Placements may overlap. Per occupied grid cell, the resolved cells are classifie
 The classification is a pure function over the assembly model, so later analysis (lock checks,
 sliding/disassembly simulation) can build on the same data.
 
+## Key-piece checks
+
+Every key piece is checked live (results in the Key Piece editor's **Checks** section, a `!` badge
+in the pieces list, and evidence drawn on the editor grid). Implemented in `src/model/checks.ts`.
+For these shape rules every unit cell counts as a **full square** whatever its kind, and
+adjacency is by **shared edges only** (corner contact connects nothing).
+
+1. **Edge-connected** — all cells form one edge-connected group. A check, not an editor
+   restriction (pieces are briefly disconnected while drawing).
+2. **No enclosed cavity** — every empty cell inside the bounding box reaches the outside through
+   edges. A diagonal corner gap does not count as an opening.
+3. **Cannot fill its own concave** — n/a unless 1 and 2 pass.
+
+Terms used by check 3:
+
+- **Notch** — a maximal run of empty cells in one row (or column) with a piece cell directly at
+  both ends. One cell is enough.
+- **Concave** — a stack of parallel notches in consecutive rows (or columns), each overlapping
+  the next. A single notch is a concave of depth 1. Its **innermost notch** is the end backed by
+  the piece (the whole line beyond it, across its span, is piece); the other end is the mouth.
+- **Solid square** — a square holding a `block`, or a spike seated in its matching hole
+  (same count, same edge). A lone spike or a lone hole is not solid.
+- **Filled concave** — every square of its innermost notch is solid.
+
+Check 3 **fails if any one concave can be filled** by copies of the piece (unlimited copies, any
+rotation/mirror), placed statically (no insertion path required), not overlapping the original
+or each other under the grid's overlap rules (only seated spike/hole pairs share a square).
+Concaves are tested independently.
+
+Decidability: only copies with a cell on the innermost notch can help, so the candidates are
+finite (≤ 8 orientations × piece cells × notch cells); a backtracking search decides it. A step
+budget guards the UI — if hit, the check reports **unknown** instead of guessing. On failure the
+editor shows the concave (orange) and one witness arrangement of copies (dashed).
+
 ## Decisions
 
 - Stack: pnpm, Vite, React 19, TypeScript, Tailwind 4, Canvas 2D rendering, vitest, oxlint

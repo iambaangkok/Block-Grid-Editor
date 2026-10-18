@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { checkPiece } from '../model/checks'
 import { isRotatable, rotateDir } from '../model/geometry'
 import { CELL_KINDS, DIR_LABEL, KIND_LABEL, type Assembly, type CellKind, type Dir, type KeyPiece } from '../model/types'
 import { Icon } from './Icon'
 import { CellIcon } from './PieceSvg'
 import { ColorPicker } from './ColorPicker'
 import { PieceCanvas, type Brush } from './PieceCanvas'
+import { checksOverlay } from './checksOverlay'
+import { PieceChecksPanel } from './PieceChecksPanel'
 
 interface Props {
   piece: KeyPiece
@@ -28,6 +31,9 @@ export function KeyPieceEditor(props: Props) {
   const [kind, setKind] = useState<CellKind>('block')
   const [dir, setDir] = useState<Dir>(0)
   const [erase, setErase] = useState(false)
+  const [showEvidence, setShowEvidence] = useState(true)
+  const checks = useMemo(() => checkPiece(piece), [piece])
+  const overlay = useMemo(() => (showEvidence ? checksOverlay(checks) : null), [checks, showEvidence])
   const brush: Brush = erase ? { tool: 'erase' } : { tool: 'paint', kind, dir }
   const uses = assembly.placements.filter((p) => p.pieceId === piece.id).length
 
@@ -49,6 +55,7 @@ export function KeyPieceEditor(props: Props) {
       <div className="flex-1 space-y-4 overflow-y-auto p-3">
         <PieceCanvas
           piece={piece}
+          overlay={overlay}
           brush={brush}
           onPaint={(x, y, op, id) => onPaint(x, y, op, id, brush)}
         />
@@ -56,6 +63,8 @@ export function KeyPieceEditor(props: Props) {
           Drag to paint · tap a cell of the same kind to rotate it · right-click or eraser to remove. The dashed cell is the
           piece origin.
         </p>
+
+        <PieceChecksPanel checks={checks} showEvidence={showEvidence} onShowEvidence={setShowEvidence} />
 
         <section>
           <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500">Unit cell</div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { AssemblyCanvas, type Ghost } from './components/AssemblyCanvas'
 import { KeyPieceEditor } from './components/KeyPieceEditor'
 import { Icon } from './components/Icon'
+import { checkPiece } from './model/checks'
 import { PieceSvg } from './components/PieceSvg'
 import { analyzeAssembly } from './model/analysis'
 import { cellBounds, rotateDir, transformPieceCells, worldCells } from './model/geometry'
@@ -36,7 +37,7 @@ import { assemblyToPng, keyPiecesToPng, type Camera } from './render/draw'
 import { downloadBlob, downloadText, pickFile, slug } from './lib/download'
 import { store, useHistory } from './state/store'
 
-const VERSION = 'v0.1.6'
+const VERSION = 'v0.2.0'
 const DEFAULT_CAMERA: Camera = { x: 0, y: 0, zoom: 36 }
 
 const btn =
@@ -485,7 +486,10 @@ export default function App() {
                     <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => setEditingPieceId(p.id)} title="Edit key piece">
                       <PieceSvg piece={p} size={36} />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm">{p.name || 'Untitled'}</span>
+                        <span className="flex items-center gap-1">
+                          <span className="truncate text-sm">{p.name || 'Untitled'}</span>
+                          <CheckBadge piece={p} />
+                        </span>
                         <span className="block text-[11px] text-neutral-400">
                           {p.cells.length} cell{p.cells.length === 1 ? '' : 's'} · {uses}× placed
                         </span>
@@ -637,3 +641,24 @@ export default function App() {
   )
 }
 
+
+/** Small marker on a key piece that fails a check (or couldn't be decided). */
+function CheckBadge({ piece }: { piece: KeyPiece }) {
+  const c = checkPiece(piece)
+  if (c.ok) return null
+  const failed = [
+    c.connected.status === 'fail' && 'not edge-connected',
+    c.cavity.status === 'fail' && 'enclosed cavity',
+    c.concave.status === 'fail' && 'can fill its own concave',
+    c.concave.status === 'unknown' && 'concave check undecided',
+  ].filter(Boolean)
+  const unknownOnly = failed.length === 1 && c.concave.status === 'unknown'
+  return (
+    <span
+      title={failed.join(' · ')}
+      className={`shrink-0 rounded px-1 text-[10px] font-bold ${unknownOnly ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}
+    >
+      {unknownOnly ? '?' : '!'}
+    </span>
+  )
+}

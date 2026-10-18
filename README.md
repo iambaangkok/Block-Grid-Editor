@@ -2,7 +2,8 @@
 
 A visual grid editor for **Interlocking Puzzle** configurations. Build key pieces from unit cells
 (block; one to four spikes on an edge; matching holes), place them on an assembly grid, and see overlaps and
-spike-into-hole fits live. Everything autosaves to localStorage; export/import as JSON, export PNG.
+spike-into-hole fits live. Each key piece is checked live (edge-connected, no enclosed cavity, cannot fill its own
+concave — see [CONTEXT.md](CONTEXT.md)). Everything autosaves to localStorage; export/import as JSON, export PNG.
 
 Live: https://www.iambaangkok.dev/block-grid-editor/
 
