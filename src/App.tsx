@@ -32,11 +32,11 @@ import {
   transformPlacements,
   updatePiece,
 } from './model/workspace'
-import { assemblyToPng, type Camera } from './render/draw'
+import { assemblyToPng, keyPiecesToPng, type Camera } from './render/draw'
 import { downloadBlob, downloadText, pickFile, slug } from './lib/download'
 import { store, useHistory } from './state/store'
 
-const VERSION = 'v0.1.4'
+const VERSION = 'v0.1.5'
 const DEFAULT_CAMERA: Camera = { x: 0, y: 0, zoom: 36 }
 
 const btn =
@@ -263,6 +263,14 @@ export default function App() {
     else downloadText(`block-grid-editor-workspace.json`, exportWorkspace(ws))
   }
 
+  const exportPiecesPng = async () => {
+    setExportOpen(false)
+    if (!asm) return
+    const blob = await keyPiecesToPng(asm.pieces)
+    if (blob) downloadBlob(`${slug(asm.name)}-key-pieces.png`, blob)
+    else setToast({ text: 'No key pieces with cells to export', tone: 'error' })
+  }
+
   const exportPng = async () => {
     setExportOpen(false)
     if (!asm) return
@@ -442,6 +450,7 @@ export default function App() {
                   <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-neutral-50" onClick={() => exportJson('assembly')}>This assembly (.json)</button>
                   <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-neutral-50" onClick={() => exportJson('workspace')}>All assemblies (.json)</button>
                   <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-neutral-50" onClick={exportPng}>This assembly (.png)</button>
+                  <button type="button" className="block w-full px-3 py-1.5 text-left hover:bg-neutral-50" onClick={exportPiecesPng}>Key pieces in a row (.png)</button>
                 </div>
               </>
             )}

@@ -279,3 +279,54 @@ export async function assemblyToPng(asm: Assembly, pxPerCell = 40): Promise<Blob
   drawAssembly(ctx, asm, pxPerCell, { showAnalysis: false })
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
 }
+
+/**
+ * Render key pieces side by side in one row (template orientation, as in the editor), each
+ * centred vertically with its name underneath. White background, no grid.
+ */
+export async function keyPiecesToPng(pieces: KeyPiece[], pxPerCell = 40): Promise<Blob | null> {
+  const items = pieces
+    .map((piece) => ({ piece, b: cellBounds(piece.cells) }))
+    .filter((it): it is { piece: KeyPiece; b: NonNullable<ReturnType<typeof cellBounds>> } => it.b !== null)
+  if (items.length === 0) return null
+
+  const pad = pxPerCell // outer margin and gap between pieces
+  const labelH = Math.round(pxPerCell * 0.9)
+  const font = `500 ${Math.round(pxPerCell * 0.36)}px ui-sans-serif, system-ui, sans-serif`
+  const rowH = Math.max(...items.map((it) => it.b.maxY - it.b.minY)) * pxPerCell
+
+  const measure = document.createElement('canvas').getContext('2d')
+  if (!measure) return null
+  measure.font = font
+  const slots = items.map((it) => {
+    const w = (it.b.maxX - it.b.minX) * pxPerCell
+    return Math.max(w, Math.ceil(measure.measureText(it.piece.name).width))
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width = slots.reduce((sum, w) => sum + w, 0) + pad * (items.length + 1)
+  canvas.height = pad * 2 + rowH + labelH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  let left = pad
+  items.forEach(({ piece, b }, i) => {
+    const w = (b.maxX - b.minX) * pxPerCell
+    const h = (b.maxY - b.minY) * pxPerCell
+    const ox = left + (slots[i] - w) / 2
+    const oy = pad + (rowH - h) / 2
+    // World → pixels for this piece: +y up, its bounding box at (ox, oy).
+    ctx.setTransform(pxPerCell, 0, 0, -pxPerCell, ox - b.minX * pxPerCell, oy + b.maxY * pxPerCell)
+    drawCells(ctx, piece.cells, { fill: piece.fill, border: piece.border, lineWidth: borderWidth(pxPerCell) })
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.fillStyle = '#495057'
+    ctx.font = font
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fillText(piece.name, left + slots[i] / 2, pad + rowH + labelH * 0.3)
+    left += slots[i] + pad
+  })
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+}

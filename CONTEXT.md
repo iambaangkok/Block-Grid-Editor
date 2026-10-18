@@ -53,7 +53,8 @@ sliding/disassembly simulation) can build on the same data.
   (~12 hues × 5 shades) plus quick defaults (yellow, bright green, pink, red, blue, orange,
   purple, black). No free hex picker.
 - Persistence: autosave everything to localStorage. Export/import JSON (single assembly or whole
-  workspace). PNG export of an assembly.
+  workspace). PNG export of an assembly, and of all its key pieces in one
+  labelled row.
 - Deploy: **subpath** `https://www.iambaangkok.dev/block-grid-editor/`. Cloudflare Worker with
   Static Assets (assets-only, no script) bound by a **route** `www.iambaangkok.dev/block-grid-editor*`
   in `wrangler.jsonc`. Routes don't strip the prefix, so Vite `base: '/block-grid-editor/'` and the
