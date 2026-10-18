@@ -105,6 +105,52 @@ export function transformPlacement(
   return { ...next, x: Math.round(bcx - acx), y: Math.round(bcy - acy) }
 }
 
+/**
+ * Rotate/mirror several placements together as one rigid group about the centre of their
+ * combined footprint, so their arrangement relative to each other is preserved.
+ */
+export function transformGroup(
+  pieces: ReadonlyMap<string, KeyPiece>,
+  placements: Placement[],
+  op: { rotCw?: number; mirror?: boolean },
+): Placement[] {
+  const all = placements.flatMap((pl) => {
+    const piece = pieces.get(pl.pieceId)
+    return piece ? worldCells(piece, pl) : []
+  })
+  const b = cellBounds(all)
+  if (!b) return placements
+  // Cell centres only land back on cell centres when the pivot's x and y are both integers or
+  // both half-integers; nudge y by half a cell if needed.
+  const cx = (b.minX + b.maxX) / 2
+  let cy = (b.minY + b.maxY) / 2
+  if (!Number.isInteger(cx - cy)) cy += 0.5
+  const rotCw = op.rotCw ?? 0
+
+  return placements.map((pl) => {
+    const piece = pieces.get(pl.pieceId)
+    const anchor = piece?.cells[0]
+    if (!piece || !anchor) return pl
+    let rot = pl.rot as number
+    if (op.mirror) rot = -rot
+    rot += rotCw
+    const next: Placement = { ...pl, mirror: op.mirror ? !pl.mirror : pl.mirror, rot: (((rot % 4) + 4) % 4) as Rot }
+    // Where the anchor cell's centre must end up after the group transform…
+    const before = transformCell(anchor, pl.rot, pl.mirror)
+    let wx = pl.x + before.x + 0.5
+    const wy = pl.y + before.y + 0.5
+    if (op.mirror) wx = 2 * cx - wx
+    const [rx, ry] = rotateOffset(wx - cx, wy - cy, rotCw)
+    // …and where it sits relative to the origin with the new orientation.
+    const after = transformCell(anchor, next.rot, next.mirror)
+    return {
+      ...next,
+      x: Math.round(cx + rx - (after.x + 0.5)),
+      y: Math.round(cy + ry - (after.y + 0.5)),
+    }
+  })
+}
+
 /** Rotate/mirror the template itself (Key Piece editor), re-normalising nothing. */
 export function transformPieceCells(cells: UnitCell[], rotCw: number, mirror: boolean): UnitCell[] {
   return cells.map((c) => transformCell(c, rotCw, mirror))

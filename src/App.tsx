@@ -36,7 +36,7 @@ import { assemblyToPng, type Camera } from './render/draw'
 import { downloadBlob, downloadText, pickFile, slug } from './lib/download'
 import { store, useHistory } from './state/store'
 
-const VERSION = 'v0.2.0'
+const VERSION = 'v0.1.3'
 const DEFAULT_CAMERA: Camera = { x: 0, y: 0, zoom: 36 }
 
 const btn =

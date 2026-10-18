@@ -11,6 +11,7 @@ import {
   transformPlacements,
 } from './workspace'
 import { WorkspaceStore } from '../state/store'
+import { analyzeAssembly } from './analysis'
 
 describe('workspace ops', () => {
   it('copying a key piece makes an independent duplicate in the target assembly', () => {
@@ -50,6 +51,36 @@ describe('workspace ops', () => {
     expect(dup.assemblies[0].placements).toHaveLength(a.placements.length + 1)
     const rotated = transformPlacements(dup, a.id, new Set(newIds), { rotCw: 1 })
     expect(rotated.assemblies[0].placements.find((p) => p.id === newIds[0])?.rot).toBe(1)
+  })
+})
+
+describe('group transforms', () => {
+  const all = (ws: ReturnType<typeof starterWorkspace>) => new Set(ws.assemblies[0].placements.map((p) => p.id))
+
+  it('rotating several pieces keeps them interlocked as one group', () => {
+    let ws = starterWorkspace()
+    const id = ws.assemblies[0].id
+    for (let i = 1; i <= 4; i++) {
+      ws = transformPlacements(ws, id, all(ws), { rotCw: 1 })
+      const a = analyzeAssembly(ws.assemblies[0])
+      expect([a.fits, a.conflicts]).toEqual([1, 0])
+    }
+  })
+
+  it('four quarter turns and two mirrors return the group to where it started', () => {
+    const start = starterWorkspace()
+    const id = start.assemblies[0].id
+    let ws = start
+    for (let i = 0; i < 4; i++) ws = transformPlacements(ws, id, all(ws), { rotCw: 1 })
+    ws = transformPlacements(ws, id, all(ws), { mirror: true })
+    ws = transformPlacements(ws, id, all(ws), { mirror: true })
+    expect(ws.assemblies[0].placements).toEqual(start.assemblies[0].placements)
+  })
+
+  it('mirroring a group keeps the fit', () => {
+    const start = starterWorkspace()
+    const ws = transformPlacements(start, start.assemblies[0].id, all(start), { mirror: true })
+    expect(analyzeAssembly(ws.assemblies[0]).fits).toBe(1)
   })
 })
 

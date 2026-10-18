@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { transformPieceCells, transformPlacement } from './geometry'
+import { transformGroup, transformPieceCells } from './geometry'
 import { presetAt } from './palette'
 import type { Assembly, KeyPiece, Placement, UnitCell, Workspace } from './types'
 
@@ -188,9 +188,13 @@ export function transformPlacements(
   ids: ReadonlySet<string>,
   op: { rotCw?: number; mirror?: boolean },
 ): Workspace {
-  return mapPlacements(ws, asmId, ids, (pl, a) => {
-    const piece = a.pieces.find((p) => p.id === pl.pieceId)
-    return piece ? transformPlacement(piece, pl, op) : pl
+  if (ids.size === 0) return ws
+  return updateAssembly(ws, asmId, (a) => {
+    const pieces = new Map(a.pieces.map((p) => [p.id, p]))
+    const moved = new Map(
+      transformGroup(pieces, a.placements.filter((pl) => ids.has(pl.id)), op).map((pl) => [pl.id, pl]),
+    )
+    return { ...a, placements: a.placements.map((pl) => moved.get(pl.id) ?? pl) }
   })
 }
 
