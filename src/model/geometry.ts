@@ -170,7 +170,37 @@ export function ghostOrigin(
 
 // ── Cell shapes ────────────────────────────────────────────────────────────
 // Unit-square local coords: (0,0) lower-left, (1,1) upper-right, +y up. Defined for dir N and
-// rotated about the centre. Spikes are half a cell deep, so their apex reaches the centre.
+// rotated about the centre.
+//
+// An edge holding n spikes is split into n equal slots; each spike's base is inset from its
+// slot's ends (so spikes never span a full edge — four single spikes don't tile a square), and
+// its depth is min(½, 1/n) so many-spike cells stay proportionate. A hole is the block with
+// exactly those triangles cut out, so a spike seats into the hole of the same count.
+
+const SPIKE_INSET = 0.15 // fraction of a slot left bare on each side of a spike's base
+
+function spikeTriangles(n: number): Polygon[] {
+  const slot = 1 / n
+  const depth = Math.min(0.5, slot)
+  const tris: Polygon[] = []
+  for (let i = 0; i < n; i++) {
+    const a = i * slot + slot * SPIKE_INSET
+    const b = (i + 1) * slot - slot * SPIKE_INSET
+    tris.push([
+      [a, 1],
+      [(a + b) / 2, 1 - depth],
+      [b, 1],
+    ])
+  }
+  return tris
+}
+
+function holePolygon(n: number): Polygon {
+  const top: Pt[] = []
+  // Walk the top edge right → left so the outline stays a simple polygon.
+  for (const [a, apex, b] of spikeTriangles(n).reverse()) top.push(b, apex, a)
+  return [[0, 0], [1, 0], [1, 1], ...top, [0, 1]]
+}
 
 const N_SHAPES: Record<CellKind, Polygon[]> = {
   block: [
@@ -181,45 +211,14 @@ const N_SHAPES: Record<CellKind, Polygon[]> = {
       [0, 1],
     ],
   ],
-  spike: [
-    [
-      [0, 1],
-      [0.5, 0.5],
-      [1, 1],
-    ],
-  ],
-  hole: [
-    [
-      [0, 0],
-      [1, 0],
-      [1, 1],
-      [0.5, 0.5],
-      [0, 1],
-    ],
-  ],
-  spike2: [
-    [
-      [0, 1],
-      [0.25, 0.5],
-      [0.5, 1],
-    ],
-    [
-      [0.5, 1],
-      [0.75, 0.5],
-      [1, 1],
-    ],
-  ],
-  hole2: [
-    [
-      [0, 0],
-      [1, 0],
-      [1, 1],
-      [0.75, 0.5],
-      [0.5, 1],
-      [0.25, 0.5],
-      [0, 1],
-    ],
-  ],
+  spike: spikeTriangles(1),
+  hole: [holePolygon(1)],
+  spike2: spikeTriangles(2),
+  hole2: [holePolygon(2)],
+  spike3: spikeTriangles(3),
+  hole3: [holePolygon(3)],
+  spike4: spikeTriangles(4),
+  hole4: [holePolygon(4)],
 }
 
 function rotatePtCw([x, y]: Pt, q: number): Pt {

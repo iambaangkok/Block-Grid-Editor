@@ -22,15 +22,15 @@ undecidability). Web SPA, live at `https://www.iambaangkok.dev/block-grid-editor
 | kind | look |
 |---|---|
 | `block` | full square (not rotatable) |
-| `spike` | no block — a triangle whose base is one cell edge, apex toward the centre |
+| `spike` | no block — a triangle on one edge; its base is inset from the edge's ends (never the full edge, so four spikes don't tile a square), apex at the centre |
 | `hole` | full block with a matching triangular notch cut in from one edge |
-| `spike2` | no block — two smaller spikes side by side on the **same** edge (each base = half the edge) |
-| `hole2` | block with two smaller notches side by side on the same edge, matching `spike2` |
+| `spike2` / `spike3` / `spike4` | no block — 2 / 3 / 4 smaller spikes side by side on the **same** edge (edge split into equal slots, each spike inset in its slot; depth min(½, 1/n)) |
+| `hole2` / `hole3` / `hole4` | block with the matching 2 / 3 / 4 notches on one edge |
 
 ### Overlap & fit
 
 Placements may overlap. Per occupied grid cell, the resolved cells are classified:
-- **fit** — `spike` in `hole` or `spike2` in `hole2`, same edge, so the triangles land exactly in the notches → shown as a valid
+- **fit** — a spike cell in the hole cell with the same count (`spikeN` in `holeN`), same edge, so the triangles land exactly in the notches → shown as a valid
   interlock indicator.
 - **conflict** — any other overlap (block/block, spike into solid, mismatched spike/hole such as `spike` into `hole2`) →
   red warning.

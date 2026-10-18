@@ -1,5 +1,5 @@
 import { cellShape, worldCells, type Polygon } from './geometry'
-import type { Assembly, CellKind, Dir, KeyPiece, WorldCell } from './types'
+import { featureCount, isHole, isSpike, type Assembly, type CellKind, type Dir, type KeyPiece, type WorldCell } from './types'
 
 // Overlap & fit classification — a pure function over the assembly model.
 //
@@ -7,7 +7,7 @@ import type { Assembly, CellKind, Dir, KeyPiece, WorldCell } from './types'
 // shape's boundary belong to no shape, so shapes that merely touch (a spike seated in its
 // notch, or spikes on different edges of the same cell) never count as overlapping.
 
-const RES = 24
+const RES = 48
 const EPS = 1e-9
 
 function onSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number) {
@@ -64,9 +64,11 @@ export function shapesOverlap(a: { kind: CellKind; dir: Dir }, b: { kind: CellKi
 
 /** A spike seated in its matching notch. */
 export function isFit(a: { kind: CellKind; dir: Dir }, b: { kind: CellKind; dir: Dir }) {
-  const pair = (s: CellKind, h: CellKind) =>
-    (a.kind === s && b.kind === h) || (a.kind === h && b.kind === s)
-  return a.dir === b.dir && (pair('spike', 'hole') || pair('spike2', 'hole2'))
+  return (
+    a.dir === b.dir &&
+    featureCount(a.kind) === featureCount(b.kind) &&
+    ((isSpike(a.kind) && isHole(b.kind)) || (isHole(a.kind) && isSpike(b.kind)))
+  )
 }
 
 export type CellStatus = 'conflict' | 'fit' | 'shared'

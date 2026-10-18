@@ -1,4 +1,4 @@
-import { analyzeAssembly, classifyCell, shapesOverlap } from './analysis'
+import { analyzeAssembly, cellMask, classifyCell, shapesOverlap } from './analysis'
 import type { Assembly, CellKind, Dir, WorldCell } from './types'
 
 const wc = (kind: CellKind, dir: Dir, placementId = 'a'): WorldCell => ({ x: 0, y: 0, kind, dir, placementId, pieceId: placementId })
@@ -12,6 +12,20 @@ describe('cell overlap', () => {
   })
   it('two spikes seat into a two-hole cell on the same edge', () => {
     expect(classifyCell([wc('spike2', 2, 'a'), wc('hole2', 2, 'b')])).toBe('fit')
+  })
+  it('three and four spikes seat into the hole with the same count', () => {
+    for (const d of [0, 1, 2, 3] as Dir[]) {
+      expect(classifyCell([wc('spike3', d, 'a'), wc('hole3', d, 'b')])).toBe('fit')
+      expect(classifyCell([wc('spike4', d, 'a'), wc('hole4', d, 'b')])).toBe('fit')
+    }
+    expect(classifyCell([wc('spike3', 0, 'a'), wc('hole4', 0, 'b')])).toBe('conflict')
+    expect(classifyCell([wc('spike4', 0, 'a'), wc('hole', 0, 'b')])).toBe('conflict')
+  })
+  it('spikes never span a full edge: four single spikes leave the cell partly empty', () => {
+    const union = new Uint8Array(cellMask('block', 0).length)
+    for (const d of [0, 1, 2, 3] as Dir[]) cellMask('spike', d).forEach((v, i) => (union[i] |= v))
+    const filled = union.reduce((n, v) => n + v, 0)
+    expect(filled).toBeLessThan(cellMask('block', 0).reduce((n, v) => n + v, 0) * 0.8)
   })
   it('mismatched edges or kinds conflict', () => {
     expect(classifyCell([wc('spike', 0, 'a'), wc('hole', 1, 'b')])).toBe('conflict')

@@ -4,7 +4,17 @@
 // [x, x+1] × [y, y+1]. Directions name a cell edge: N (+y), E (+x), S (−y), W (−x), numbered
 // clockwise so a clockwise quarter turn is `dir + 1`.
 
-export const CELL_KINDS = ['block', 'spike', 'hole', 'spike2', 'hole2'] as const
+export const CELL_KINDS = [
+  'block',
+  'spike',
+  'hole',
+  'spike2',
+  'hole2',
+  'spike3',
+  'hole3',
+  'spike4',
+  'hole4',
+] as const
 export type CellKind = (typeof CELL_KINDS)[number]
 
 /** 0 = N, 1 = E, 2 = S, 3 = W. */
@@ -75,6 +85,18 @@ export const KIND_LABEL: Record<CellKind, string> = {
   hole: 'Hole',
   spike2: 'Two spikes',
   hole2: 'Two holes',
+  spike3: 'Three spikes',
+  hole3: 'Three holes',
+  spike4: 'Four spikes',
+  hole4: 'Four holes',
 }
+
+/** Spikes / notches on the cell's edge: 0 for a block. */
+export function featureCount(kind: CellKind): number {
+  return kind === 'block' ? 0 : kind.endsWith('2') ? 2 : kind.endsWith('3') ? 3 : kind.endsWith('4') ? 4 : 1
+}
+
+export const isSpike = (kind: CellKind) => kind.startsWith('spike')
+export const isHole = (kind: CellKind) => kind.startsWith('hole')
 
 export const DIR_LABEL = ['N', 'E', 'S', 'W'] as const
