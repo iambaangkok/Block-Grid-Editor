@@ -164,29 +164,75 @@ export function AssemblyCanvas(props: Props) {
   }
 
   // ── Wheel (non-passive so we can preventDefault) ──
+  // Zoom eases toward a target over a few frames, keeping the world point under the cursor
+  // fixed. Mouse-wheel notches step ~8%; trackpad pinch (ctrl + small deltas) is finer still.
+  const zoomAnim = useRef<{ target: number; sx: number; sy: number; raf: number } | null>(null)
+  const stopZoomAnim = () => {
+    if (zoomAnim.current) cancelAnimationFrame(zoomAnim.current.raf)
+    zoomAnim.current = null
+  }
+
   useEffect(() => {
     const canvas = ref.current
     if (!canvas) return
+
+    const zoomAt = (zoom: number, sx: number, sy: number) => {
+      const rect = canvas.getBoundingClientRect()
+      const cam = camRef.current
+      const before = screenToWorld(cam, rect.width, rect.height, sx, sy)
+      const after = screenToWorld({ ...cam, zoom }, rect.width, rect.height, sx, sy)
+      const next = { zoom, x: cam.x + before.x - after.x, y: cam.y + before.y - after.y }
+      camRef.current = next
+      onCamera(next)
+    }
+
+    const step = () => {
+      const a = zoomAnim.current
+      if (!a) return
+      const cur = camRef.current.zoom
+      const gap = Math.log(a.target / cur)
+      if (Math.abs(gap) < 0.002) {
+        zoomAt(a.target, a.sx, a.sy)
+        zoomAnim.current = null
+        return
+      }
+      zoomAt(cur * Math.exp(gap * 0.35), a.sx, a.sy)
+      a.raf = requestAnimationFrame(step)
+    }
+
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       const rect = canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
-      const cam = camRef.current
       const lineMode = e.deltaMode !== 0
       const mouseWheel = lineMode || (e.deltaX === 0 && Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY))
       if (e.ctrlKey || e.metaKey || mouseWheel) {
         const dy = lineMode ? e.deltaY * 33 : e.deltaY
-        const zoom = clampZoom(cam.zoom * Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0015)))
-        const before = screenToWorld(cam, rect.width, rect.height, sx, sy)
-        const after = screenToWorld({ ...cam, zoom }, rect.width, rect.height, sx, sy)
-        onCamera({ zoom, x: cam.x + before.x - after.x, y: cam.y + before.y - after.y })
+        // ~8% per 100px notch (capped so a fast flick can't jump wildly); pinch deltas are tiny
+        // and frequent, so they get a gentler per-unit rate.
+        const pinch = !mouseWheel && Math.abs(dy) < 50
+        const amount = pinch ? -dy * 0.006 : -Math.sign(dy) * Math.min(Math.abs(dy), 300) * 0.0008
+        const base = zoomAnim.current?.target ?? camRef.current.zoom
+        const target = clampZoom(base * Math.exp(amount))
+        if (zoomAnim.current) {
+          Object.assign(zoomAnim.current, { target, sx, sy })
+        } else {
+          zoomAnim.current = { target, sx, sy, raf: requestAnimationFrame(step) }
+        }
       } else {
-        onCamera({ ...cam, x: cam.x + e.deltaX / cam.zoom, y: cam.y - e.deltaY / cam.zoom })
+        stopZoomAnim()
+        const cam = camRef.current
+        const next = { ...cam, x: cam.x + e.deltaX / cam.zoom, y: cam.y - e.deltaY / cam.zoom }
+        camRef.current = next
+        onCamera(next)
       }
     }
     canvas.addEventListener('wheel', onWheel, { passive: false })
-    return () => canvas.removeEventListener('wheel', onWheel)
+    return () => {
+      canvas.removeEventListener('wheel', onWheel)
+      stopZoomAnim()
+    }
   }, [ref, onCamera])
 
   // ── Space-to-pan ──
@@ -226,6 +272,7 @@ export function AssemblyCanvas(props: Props) {
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    stopZoomAnim()
     const p = localPoint(e)
     e.currentTarget.setPointerCapture(e.pointerId)
     pointers.current.set(e.pointerId, p)
