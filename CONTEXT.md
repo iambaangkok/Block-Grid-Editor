@@ -44,8 +44,9 @@ sliding/disassembly simulation) can build on the same data.
   (mirrors `tweet-typer`).
 - Input: desktop mouse + touch (pointer events, pinch-zoom, pan).
 - Infinite pan/zoom canvas, white background, light grid lines, axes through origin.
-- Editing: select / box-select / move / rotate (R) / mirror (F) / duplicate / delete; undo/redo
-  (Ctrl+Z / Ctrl+Shift+Z).
+- Editing: select / box-select / move / rotate (→ / ← or R / Shift+R) / mirror (F) / duplicate /
+  delete; Shift+Arrow nudges; copy / cut / paste (Ctrl+C / X / V — in-app clipboard, pastes at the
+  pointer, works across assemblies by copying the key pieces along); undo/redo (Ctrl+Z / Ctrl+Shift+Z).
 - Key Piece editor: separate panel with its own small grid; place cells freely, rotate cells in
   90° steps; mirror whole piece.
 - Colours: per Key Piece — border + fill only, no stroke width. Excalidraw-style palette

@@ -1,6 +1,8 @@
 import { exportAssembly, exportWorkspace, ImportError, parseImport, parseStoredWorkspace } from './io'
 import {
   cloneAssembly,
+  copyToClipboard,
+  pasteClipboard,
   copyPieceTo,
   deletePiece,
   duplicatePlacements,
@@ -48,6 +50,37 @@ describe('workspace ops', () => {
     expect(dup.assemblies[0].placements).toHaveLength(a.placements.length + 1)
     const rotated = transformPlacements(dup, a.id, new Set(newIds), { rotCw: 1 })
     expect(rotated.assemblies[0].placements.find((p) => p.id === newIds[0])?.rot).toBe(1)
+  })
+})
+
+describe('clipboard', () => {
+  it('pastes into the same assembly linked to the existing key piece', () => {
+    const ws = starterWorkspace()
+    const a = ws.assemblies[0]
+    const clip = copyToClipboard(a, new Set([a.placements[0].id]))!
+    const { ws: next, newIds } = pasteClipboard(ws, a.id, clip, 2, 3)
+    const pasted = next.assemblies[0].placements.find((p) => p.id === newIds[0])!
+    expect(pasted.pieceId).toBe(a.placements[0].pieceId)
+    expect([pasted.x, pasted.y]).toEqual([a.placements[0].x + 2, a.placements[0].y + 3])
+    expect(next.assemblies[0].pieces).toHaveLength(a.pieces.length)
+  })
+
+  it('pasting into another assembly brings independent copies of the key pieces', () => {
+    let ws = starterWorkspace()
+    const a = ws.assemblies[0]
+    const other = { ...cloneAssembly(a, 'Other'), pieces: [], placements: [] }
+    ws = { ...ws, assemblies: [...ws.assemblies, other] }
+    const clip = copyToClipboard(a, new Set(a.placements.map((p) => p.id)))!
+    const { ws: next, newIds } = pasteClipboard(ws, other.id, clip, 0, 0)
+    const target = next.assemblies[1]
+    expect(newIds).toHaveLength(2)
+    expect(target.pieces).toHaveLength(2)
+    expect(target.pieces.every((p) => !a.pieces.some((q) => q.id === p.id))).toBe(true)
+    expect(target.placements.every((pl) => target.pieces.some((p) => p.id === pl.pieceId))).toBe(true)
+  })
+
+  it('nothing selected → no clipboard', () => {
+    expect(copyToClipboard(starterWorkspace().assemblies[0], new Set())).toBeNull()
   })
 })
 

@@ -4,7 +4,7 @@ import { KeyPieceEditor } from './components/KeyPieceEditor'
 import { Icon } from './components/Icon'
 import { PieceSvg } from './components/PieceSvg'
 import { analyzeAssembly } from './model/analysis'
-import { rotateDir, transformPieceCells } from './model/geometry'
+import { cellBounds, rotateDir, transformPieceCells, worldCells } from './model/geometry'
 import { exportAssembly, exportWorkspace, ImportError, parseImport } from './model/io'
 import type { KeyPiece, Rot } from './model/types'
 import {
@@ -13,6 +13,9 @@ import {
   addPiece,
   addPlacement,
   bringToFront,
+  copyToClipboard,
+  pasteClipboard,
+  type Clipboard,
   cloneAssembly,
   copyPieceTo,
   deleteAssembly,
@@ -33,7 +36,7 @@ import { assemblyToPng, type Camera } from './render/draw'
 import { downloadBlob, downloadText, pickFile, slug } from './lib/download'
 import { store, useHistory } from './state/store'
 
-const VERSION = 'v0.1.0'
+const VERSION = 'v0.2.0'
 const DEFAULT_CAMERA: Camera = { x: 0, y: 0, zoom: 36 }
 
 const btn =
@@ -57,6 +60,7 @@ export default function App() {
   const [showAnalysis, setShowAnalysis] = useState(true)
   const [cameras, setCameras] = useState<Record<string, Camera>>({})
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
+  const clipboard = useRef<{ clip: Clipboard; pastes: number } | null>(null)
   const [toast, setToast] = useState<{ text: string; tone: 'info' | 'error' } | null>(null)
   const [leftOpen, setLeftOpen] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
@@ -162,6 +166,46 @@ export default function App() {
     if (!asm) return
     if (placing) return setPlacing({ ...placing, mirror: !placing.mirror, rot: ((4 - placing.rot) % 4) as Rot })
     commit((w) => transformPlacements(w, asm.id, liveSelection, { mirror: true }))
+  }
+
+  const copySelection = () => {
+    if (!asm) return false
+    const clip = copyToClipboard(asm, liveSelection)
+    if (!clip) return false
+    clipboard.current = { clip, pastes: 0 }
+    setToast({ text: `Copied ${clip.placements.length} piece${clip.placements.length === 1 ? '' : 's'}`, tone: 'info' })
+    return true
+  }
+
+  /** Paste centred on the pointer when it's over the grid, otherwise stepped off the originals. */
+  const paste = () => {
+    if (!asm || !clipboard.current) return
+    const entry = clipboard.current
+    const { clip } = entry
+    let dx: number
+    let dy: number
+    const pieces = new Map(clip.pieces.map((p) => [p.id, p]))
+    const cells = clip.placements.flatMap((pl) => {
+      const piece = pieces.get(pl.pieceId)
+      return piece ? worldCells(piece, pl) : []
+    })
+    const b = cellBounds(cells)
+    if (cursor && b) {
+      dx = cursor.x - Math.floor((b.minX + b.maxX - 1) / 2)
+      dy = cursor.y - Math.floor((b.minY + b.maxY - 1) / 2)
+    } else {
+      entry.pastes++
+      dx = entry.pastes
+      dy = -entry.pastes
+    }
+    let ids: string[] = []
+    commit((w) => {
+      const r = pasteClipboard(w, asm.id, clip, dx, dy)
+      ids = r.newIds
+      return r.ws
+    })
+    setPlacing(null)
+    setSelection(new Set(ids))
   }
 
   const duplicateSelection = () => {
@@ -280,6 +324,16 @@ export default function App() {
     } else if (mod && k === 'd') {
       e.preventDefault()
       duplicateSelection()
+    } else if (mod && k === 'c') {
+      if (copySelection()) e.preventDefault()
+    } else if (mod && k === 'x') {
+      if (copySelection()) {
+        e.preventDefault()
+        deleteSelection()
+      }
+    } else if (mod && k === 'v') {
+      e.preventDefault()
+      paste()
     } else if (mod && k === 'a') {
       e.preventDefault()
       if (asm) setSelection(new Set(asm.placements.map((p) => p.id)))
@@ -301,11 +355,17 @@ export default function App() {
       setPanMode(false)
     } else if (k === '0') {
       fitView()
-    } else if (e.key.startsWith('Arrow') && liveSelection.size > 0) {
+    } else if (e.key.startsWith('Arrow') && e.shiftKey) {
+      // Shift+Arrow nudges the selection one cell.
+      if (liveSelection.size === 0) return
       e.preventDefault()
-      const step = e.shiftKey ? 4 : 1
-      const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key]
+      const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key]
       if (d) moveSelection(liveSelection, d[0], d[1], 'nudge')
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      // ← / → rotate the selection (or the piece being placed) 90° counter-clockwise / clockwise.
+      if (liveSelection.size === 0 && !placing) return
+      e.preventDefault()
+      rotateSelection(e.key === 'ArrowRight' ? 1 : -1)
     }
   }
   useLayoutEffect(() => {
@@ -476,8 +536,8 @@ export default function App() {
               ) : (
                 <span className="px-2 whitespace-nowrap text-neutral-600">{liveSelection.size} selected</span>
               )}
-              <button type="button" className={iconBtn} onClick={() => rotateSelection(-1)} title="Rotate 90° counter-clockwise (Shift+R)"><Icon name="rotCcw" /></button>
-              <button type="button" className={iconBtn} onClick={() => rotateSelection(1)} title="Rotate 90° clockwise (R)"><Icon name="rotCw" /></button>
+              <button type="button" className={iconBtn} onClick={() => rotateSelection(-1)} title="Rotate 90° counter-clockwise (← or Shift+R)"><Icon name="rotCcw" /></button>
+              <button type="button" className={iconBtn} onClick={() => rotateSelection(1)} title="Rotate 90° clockwise (→ or R)"><Icon name="rotCw" /></button>
               <button type="button" className={iconBtn} onClick={mirrorSelection} title="Mirror (F)"><Icon name="mirror" /></button>
               {ghost ? (
                 <button type="button" className={iconBtn} onClick={() => setPlacing(null)} title="Cancel (Esc)"><Icon name="close" /></button>

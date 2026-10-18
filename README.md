@@ -16,11 +16,12 @@ pnpm test && pnpm lint && pnpm build
 
 | | Mouse / keyboard | Touch |
 |---|---|---|
-| Move piece | drag it (arrows nudge, Shift ×4) | drag it |
+| Move piece | drag it (Shift+arrows nudge one cell) | drag it |
 | Select | click, Shift+click, drag a box, Ctrl+A | tap |
 | Pan | middle/right drag, Space+drag, H tool, trackpad scroll | drag empty space |
 | Zoom | wheel, ctrl/pinch on trackpad | pinch |
-| Rotate / mirror | R, Shift+R / F | toolbar |
+| Rotate / mirror | → or R (clockwise), ← or Shift+R / F | toolbar |
+| Copy / cut / paste | Ctrl+C / Ctrl+X / Ctrl+V (pastes at the pointer) | — |
 | Duplicate / delete | Ctrl+D / Del | toolbar |
 | Undo / redo | Ctrl+Z / Ctrl+Shift+Z | toolbar |
 | Edit key piece | double-click a piece | ✎ in toolbar |

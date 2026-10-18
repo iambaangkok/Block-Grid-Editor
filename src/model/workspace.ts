@@ -220,6 +220,68 @@ export function duplicatePlacements(
   }
 }
 
+// ── Clipboard ──────────────────────────────────────────────────────────────
+
+/** Snapshot of copied placements plus the key pieces they use, so a paste can land anywhere. */
+export interface Clipboard {
+  sourceAsmId: string
+  pieces: KeyPiece[]
+  placements: Placement[]
+}
+
+export function copyToClipboard(asm: Assembly, ids: ReadonlySet<string>): Clipboard | null {
+  const placements = asm.placements.filter((pl) => ids.has(pl.id))
+  if (placements.length === 0) return null
+  const used = new Set(placements.map((pl) => pl.pieceId))
+  return {
+    sourceAsmId: asm.id,
+    pieces: asm.pieces.filter((p) => used.has(p.id)).map((p) => ({ ...p, cells: p.cells.map((c) => ({ ...c })) })),
+    placements: placements.map((pl) => ({ ...pl })),
+  }
+}
+
+/**
+ * Paste clipboard placements shifted by (dx, dy). Placements stay linked to their key piece when
+ * it still exists in the target assembly; otherwise the piece is copied in first (once per paste).
+ */
+export function pasteClipboard(
+  ws: Workspace,
+  asmId: string,
+  clip: Clipboard,
+  dx: number,
+  dy: number,
+): { ws: Workspace; newIds: string[] } {
+  const target = ws.assemblies.find((a) => a.id === asmId)
+  if (!target) return { ws, newIds: [] }
+  const existing = new Set(target.pieces.map((p) => p.id))
+  const pieceMap = new Map<string, string>()
+  const newPieces: KeyPiece[] = []
+  for (const p of clip.pieces) {
+    if (asmId === clip.sourceAsmId && existing.has(p.id)) {
+      pieceMap.set(p.id, p.id)
+    } else {
+      const copy = clonePiece(p, p.name)
+      pieceMap.set(p.id, copy.id)
+      newPieces.push(copy)
+    }
+  }
+  const copies = clip.placements.map((pl) => ({
+    ...pl,
+    id: newId(),
+    pieceId: pieceMap.get(pl.pieceId)!,
+    x: pl.x + dx,
+    y: pl.y + dy,
+  }))
+  return {
+    ws: updateAssembly(ws, asmId, (a) => ({
+      ...a,
+      pieces: [...a.pieces, ...newPieces],
+      placements: [...a.placements, ...copies],
+    })),
+    newIds: copies.map((c) => c.id),
+  }
+}
+
 export function bringToFront(ws: Workspace, asmId: string, ids: ReadonlySet<string>): Workspace {
   return updateAssembly(ws, asmId, (a) => {
     const front = a.placements.filter((pl) => ids.has(pl.id))
