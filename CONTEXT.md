@@ -42,13 +42,26 @@ sliding/disassembly simulation) can build on the same data.
 
 Every key piece is checked live (results in the Key Piece editor's **Checks** section, a `!` badge
 in the pieces list, and evidence drawn on the editor grid). Implemented in `src/model/checks.ts`.
-For these shape rules every unit cell counts as a **full square** whatever its kind, and
-adjacency is by **shared edges only** (corner contact connects nothing).
+For connectivity and notches every unit cell counts as a **full square** whatever its kind;
+cavities also look at the empty space inside unseated spike/hole cells (below). Adjacency is by
+**shared edges only** (corner contact connects nothing).
 
 1. **Edge-connected** — all cells form one edge-connected group. A check, not an editor
    restriction (pieces are briefly disconnected while drawing).
-2. **No enclosed cavity** — every empty cell inside the bounding box reaches the outside through
-   edges. A diagonal corner gap does not count as an opening.
+2. **No enclosed cavity** — all empty space reaches the outside through edges. A diagonal corner
+   gap does not count as an opening. Empty space is tracked per square, including space inside
+   occupied squares:
+
+   | square holds | its empty space opens onto |
+   |---|---|
+   | nothing | all 4 edges |
+   | block, or a seated spike/hole pair | — (solid) |
+   | a lone hole cell (`hole`…`hole4`) | only its notch edge |
+   | unseated spike cell(s) | all 4 edges (bases are inset, so the base edge has open strips) |
+
+   Space crosses between neighbouring squares only where both sides are open on the shared edge.
+   So an **unpaired hole** whose notch faces into the piece, or an **unpaired spike** walled in on
+   every side, is an enclosed cavity.
 3. **Cannot fill its own concave** — n/a unless 1 and 2 pass.
 
 Terms used by check 3:
@@ -61,8 +74,9 @@ Terms used by check 3:
 - **Solid square** — a square holding a `block`, or a spike seated in its matching hole
   (same count, same edge). A lone spike or a lone hole is not solid.
 - **Filled concave** — every square of its innermost notch is solid.
-- **Gap** — an empty square sealed off (edges only, whole squares) by the piece plus the copies
-  placed to fill it. A fill must not trap a gap; arrangements that do are rejected.
+- **Gap** — an enclosed cavity (same rule as check 2, including unpaired spikes/holes) in the
+  piece plus the copies placed to fill it. A fill must not trap a gap; arrangements that do are
+  rejected.
 
 Check 3 **fails if any one concave can be filled** by copies of the piece (unlimited copies, any
 rotation/mirror), placed statically (no insertion path required), not overlapping the original

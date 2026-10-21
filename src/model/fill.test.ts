@@ -1,7 +1,7 @@
 import { buildOccupancy, classifyCell } from './analysis'
 import { findConcaves } from './checks'
 import { isSolid, searchFills } from './fill'
-import { enclosedCells } from './shape'
+import { enclosedSquares } from './shape'
 import type { CellKind, Dir, KeyPiece, UnitCell } from './types'
 
 function art(id: string, rows: string[], legend: Record<string, [CellKind, Dir]> = {}): KeyPiece {
@@ -35,8 +35,7 @@ function expectValid(target: KeyPiece, fillers: KeyPiece[], concaveIdx: number, 
   for (const cells of occ.values()) expect(classifyCell(cells)).not.toBe('conflict')
   for (const sq of concave.innermost.cells) expect(isSolid(occ.get(`${sq.x},${sq.y}`) ?? [])).toBe(true)
   // No gaps: nothing sealed off by the target + copies.
-  const squares = [...occ.keys()].map((k) => ({ x: Number(k.split(',')[0]), y: Number(k.split(',')[1]) }))
-  expect(enclosedCells(squares)).toEqual([])
+  expect(enclosedSquares(occ)).toEqual([])
 }
 
 const slot2 = art('slot2', ['# . . #', '# # # #'])

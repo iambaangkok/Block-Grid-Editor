@@ -39,6 +39,30 @@ describe('enclosed cavities', () => {
   it('a diagonal corner gap does not let space escape', () => {
     expect(enclosedCells(art(['# # .', '# . #', '# # #']).cells)).toEqual([{ x: 1, y: 1 }])
   })
+  it('a hole whose notch faces into the piece is an enclosed cavity', () => {
+    // Hole at (0,0) with its notch facing E, straight into the block next to it.
+    expect(enclosedCells(art(['h #'], { h: ['hole', 1] }).cells)).toEqual([{ x: 0, y: 0 }])
+    // Facing outwards (W) it's open to the outside.
+    expect(enclosedCells(art(['h #'], { h: ['hole', 3] }).cells)).toEqual([])
+  })
+  it('two holes facing each other seal their notches together', () => {
+    expect(enclosedCells(art(['h g'], { h: ['hole', 1], g: ['hole', 3] }).cells)).toHaveLength(2)
+  })
+  it('an unseated spike walled in on every side is an enclosed cavity', () => {
+    const p = art(['# # #', '# s #', '# # #'], { s: ['spike', 0] })
+    expect(enclosedCells(p.cells)).toEqual([{ x: 1, y: 1 }])
+  })
+  it('a spike with any open side is fine', () => {
+    expect(enclosedCells(art(['# s .', '# # #'], { s: ['spike', 3] }).cells)).toEqual([])
+  })
+  it('a hole notch opening onto a space that is itself sealed is enclosed with it', () => {
+    // Ring with a hole on the inside wall facing into the sealed middle.
+    const p = art(['# # #', 'h . #', '# # #'], { h: ['hole', 1] })
+    expect(enclosedCells(p.cells).sort((a, b) => a.x - b.x)).toEqual([
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ])
+  })
   it('a U has no cavity', () => {
     expect(enclosedCells(art(['# . #', '# # #']).cells)).toEqual([])
   })

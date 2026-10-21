@@ -1,6 +1,6 @@
 import { cellKey, isFit, shapesOverlap } from './analysis'
 import type { Concave } from './checks'
-import { enclosedCells } from './shape'
+import { enclosedSquares, isSolid } from './shape'
 import { worldCells } from './geometry'
 import type { KeyPiece, Placement, Rot, UnitCell } from './types'
 
@@ -15,13 +15,7 @@ import type { KeyPiece, Placement, Rot, UnitCell } from './types'
 
 type Cell = Pick<UnitCell, 'kind' | 'dir'>
 
-/** A square is solid when it holds a block, or a spike with its matching hole seated on it. */
-export function isSolid(occupants: readonly Cell[]): boolean {
-  if (occupants.some((c) => c.kind === 'block')) return true
-  for (let i = 0; i < occupants.length; i++)
-    for (let j = i + 1; j < occupants.length; j++) if (isFit(occupants[i], occupants[j])) return true
-  return false
-}
+export { isSolid }
 
 const ORIENTATIONS: { rot: Rot; mirror: boolean }[] = []
 for (const mirror of [false, true]) for (const rot of [0, 1, 2, 3] as Rot[]) ORIENTATIONS.push({ rot, mirror })
@@ -123,12 +117,8 @@ export function searchFills(
     placed.pop()
   }
 
-  /** No gaps: the target plus the copies must not seal off any empty square (edge-only). */
-  const trapsGap = () =>
-    enclosedCells([...occ.keys()].map((k) => {
-      const [x, y] = k.split(',').map(Number)
-      return { x, y }
-    })).length > 0
+  /** No gaps: the target plus the copies must not seal off any empty space. */
+  const trapsGap = () => enclosedSquares(occ).length > 0
 
   const found = new Map<string, FillArrangement>()
   const want = opts.probeMore === false ? opts.max : opts.max + 1 // one extra tells us whether the limit was reached
