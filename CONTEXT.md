@@ -61,10 +61,13 @@ Terms used by check 3:
 - **Solid square** — a square holding a `block`, or a spike seated in its matching hole
   (same count, same edge). A lone spike or a lone hole is not solid.
 - **Filled concave** — every square of its innermost notch is solid.
+- **Gap** — an empty square sealed off (edges only, whole squares) by the piece plus the copies
+  placed to fill it. A fill must not trap a gap; arrangements that do are rejected.
 
 Check 3 **fails if any one concave can be filled** by copies of the piece (unlimited copies, any
 rotation/mirror), placed statically (no insertion path required), not overlapping the original
-or each other under the grid's overlap rules (only seated spike/hole pairs share a square).
+or each other under the grid's overlap rules (only seated spike/hole pairs share a square),
+and without trapping a gap.
 Concaves are tested independently.
 
 Decidability: only copies with a cell on the innermost notch can help, so the candidates are
@@ -80,7 +83,7 @@ Not a check — a search tool in the Key Piece editor (**Fill candidates** secti
 - For the open key piece (the **target**, fixed in place), for each concave, list the
   **arrangements** of filler pieces that make every square of its innermost notch solid. Same
   filling rules as check 3 (static placement, grid overlap rules, solid = block or seated
-  spike/hole pair). Needs the target to be edge-connected with no enclosed cavity.
+  spike/hole pair, no trapped gap). Needs the target to be edge-connected with no enclosed cavity.
 - **Fillers**: every key piece in the assembly whose **use as filler** toggle is on (the target
   included), unlimited copies each, any rotation/mirror. The toggle is saved on the piece as
   `filler: false` (absent = on), so it persists, exports, and undoes; it's switched with the key

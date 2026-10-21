@@ -1,6 +1,7 @@
 import { buildOccupancy, classifyCell } from './analysis'
 import { findConcaves } from './checks'
 import { isSolid, searchFills } from './fill'
+import { enclosedCells } from './shape'
 import type { CellKind, Dir, KeyPiece, UnitCell } from './types'
 
 function art(id: string, rows: string[], legend: Record<string, [CellKind, Dir]> = {}): KeyPiece {
@@ -33,6 +34,9 @@ function expectValid(target: KeyPiece, fillers: KeyPiece[], concaveIdx: number, 
   const occ = buildOccupancy(asm)
   for (const cells of occ.values()) expect(classifyCell(cells)).not.toBe('conflict')
   for (const sq of concave.innermost.cells) expect(isSolid(occ.get(`${sq.x},${sq.y}`) ?? [])).toBe(true)
+  // No gaps: nothing sealed off by the target + copies.
+  const squares = [...occ.keys()].map((k) => ({ x: Number(k.split(',')[0]), y: Number(k.split(',')[1]) }))
+  expect(enclosedCells(squares)).toEqual([])
 }
 
 const slot2 = art('slot2', ['# . . #', '# # # #'])
@@ -90,6 +94,17 @@ describe('fill candidates', () => {
       prev = a.copies.length
       expectValid(slot2, fillers, 0, a.copies)
     }
+  })
+
+  it('rejects arrangements that trap a gap', () => {
+    // A 2-wide, 2-deep U. A C-shaped filler can make the innermost row solid with its bottom
+    // arm, but its body then seals the square above that arm against the U's wall.
+    const u = art('u', ['# . . #', '# . . #', '# # # #'])
+    const c = art('c', ['# #', '# .', '# #'])
+    const concave = findConcaves(u.cells)[0]
+    const withGaps = searchFills(u, [c], concave, { max: 20, allowGaps: true })
+    expect(withGaps.arrangements.length).toBeGreaterThan(0)
+    expect(searchFills(u, [c], concave, { max: 20 }).arrangements).toEqual([])
   })
 
   it('reports budget exhaustion but keeps what it found', () => {

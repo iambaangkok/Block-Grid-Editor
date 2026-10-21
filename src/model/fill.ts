@@ -1,13 +1,15 @@
 import { cellKey, isFit, shapesOverlap } from './analysis'
 import type { Concave } from './checks'
+import { enclosedCells } from './shape'
 import { worldCells } from './geometry'
 import type { KeyPiece, Placement, Rot, UnitCell } from './types'
 
 // Filling a concave's innermost notch — see CONTEXT.md "Fill candidates".
 //
 // Copies of the filler pieces (unlimited, any rotation/mirror) are placed statically around the
-// fixed target piece. Every innermost-notch square must end up solid, and no two cells may
-// overlap under the grid's rules (only a seated spike/hole pair shares a square). Only copies
+// fixed target piece. Every innermost-notch square must end up solid, no two cells may overlap
+// under the grid's rules (only a seated spike/hole pair shares a square), and the result must not
+// trap a gap — an empty square sealed off (edge-only) by the target and the copies. Only copies
 // with a cell on the notch can help, so the candidate placements are finite; a backtracking
 // search enumerates arrangements of them.
 
@@ -53,8 +55,11 @@ export function searchFills(
   target: KeyPiece,
   fillers: readonly KeyPiece[],
   concave: Concave,
-  /** `probeMore: false` skips looking for one extra arrangement (limitReached is then false). */
-  opts: { max: number; budget?: number; probeMore?: boolean },
+  /**
+   * `probeMore: false` skips looking for one extra arrangement (limitReached is then false).
+   * `allowGaps` keeps arrangements that trap empty squares (off normally; for tests).
+   */
+  opts: { max: number; budget?: number; probeMore?: boolean; allowGaps?: boolean },
 ): FillSearchResult {
   const budget = opts.budget ?? FILL_BUDGET
   const squares = concave.innermost.cells.map((c) => cellKey(c.x, c.y))
@@ -118,6 +123,13 @@ export function searchFills(
     placed.pop()
   }
 
+  /** No gaps: the target plus the copies must not seal off any empty square (edge-only). */
+  const trapsGap = () =>
+    enclosedCells([...occ.keys()].map((k) => {
+      const [x, y] = k.split(',').map(Number)
+      return { x, y }
+    })).length > 0
+
   const found = new Map<string, FillArrangement>()
   const want = opts.probeMore === false ? opts.max : opts.max + 1 // one extra tells us whether the limit was reached
   let steps = 0
@@ -136,6 +148,7 @@ export function searchFills(
     const square = squares.find((k) => !isSolid(occ.get(k) ?? []))
     if (!square) {
       if (placed.length !== depth) return // found at a shallower depth already
+      if (!opts.allowGaps && trapsGap()) return
       const key = placed
         .map((c) => c.sig)
         .sort()
