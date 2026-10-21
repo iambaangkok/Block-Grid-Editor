@@ -9,6 +9,7 @@ export function FillCandidatesPanel({
   selected,
   onSelect,
   onHoverConcave,
+  onHoverArrangement,
   status,
 }: {
   fills: ConcaveFillsResult[]
@@ -19,6 +20,8 @@ export function FillCandidatesPanel({
   selected: string | null
   onSelect: (key: string | null) => void
   onHoverConcave: (index: number | null) => void
+  /** Pointer over an arrangement row: preview it until the pointer leaves. */
+  onHoverArrangement: (key: string | null) => void
   /** Why there is nothing to search, if so. */
   status: string | null
 }) {
@@ -46,8 +49,8 @@ export function FillCandidatesPanel({
         </label>
       </div>
       <p className="mb-2 text-[11px] leading-snug text-neutral-500">
-        Arrangements of filler pieces ({fillerCount} enabled) that make each concave’s innermost notch solid. Click one to
-        preview it.
+        Arrangements of filler pieces ({fillerCount} enabled) that make each concave’s innermost notch solid. Hover one to
+        preview it, click to keep it shown.
       </p>
 
       {status ? (
@@ -74,6 +77,8 @@ export function FillCandidatesPanel({
                       <button
                         type="button"
                         onClick={() => onSelect(active ? null : key)}
+                        onPointerEnter={(e) => e.pointerType === 'mouse' && onHoverArrangement(key)}
+                        onPointerLeave={() => onHoverArrangement(null)}
                         className={`flex w-full items-baseline gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[11px] ${
                           active ? 'bg-indigo-50 text-indigo-700' : 'text-neutral-700 hover:bg-neutral-50'
                         }`}

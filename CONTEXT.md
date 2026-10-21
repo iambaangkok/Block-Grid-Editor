@@ -111,8 +111,8 @@ Not a check — a search tool in the Key Piece editor (**Fill candidates** secti
 - **Live**: recomputed when the target, any filler's cells, a toggle, or the cap changes (cached on
   that geometry, so renames/recolours don't re-run it).
 - Concaves are numbered top-to-bottom, left-to-right by their innermost notch and labelled with the
-  direction their mouth opens. Hovering one outlines it; clicking an arrangement previews its copies
-  on the editor grid in each filler's own colours.
+  direction their mouth opens. Hovering one outlines it; hovering an arrangement previews its copies
+  on the editor grid in each filler's own colours, and clicking pins that preview.
 
 ## Decisions
 

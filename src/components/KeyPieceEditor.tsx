@@ -40,6 +40,8 @@ export function KeyPieceEditor(props: Props) {
   const [cap, setCap] = useFillCap()
   const [previewKey, setPreviewKey] = useState<string | null>(null)
   const [hoverConcave, setHoverConcave] = useState<number | null>(null)
+  // Hovering an arrangement previews it; clicking pins it so it stays after the pointer leaves.
+  const [hoverKey, setHoverKey] = useState<string | null>(null)
   const shapeOk = checks.connected.status === 'pass' && checks.cavity.status === 'pass'
   const fills = useMemo(() => {
     if (!shapeOk || piece.cells.length === 0) return []
@@ -53,8 +55,9 @@ export function KeyPieceEditor(props: Props) {
 
   const overlay = useMemo(() => {
     const byId = new Map(assembly.pieces.map((p) => [p.id, p]))
-    const [ci, ai] = (previewKey ?? '').split(':').map(Number)
-    const arrangement = previewKey ? fills[ci]?.result.arrangements[ai] : undefined
+    const shownKey = hoverKey ?? previewKey
+    const [ci, ai] = (shownKey ?? '').split(':').map(Number)
+    const arrangement = shownKey ? fills[ci]?.result.arrangements[ai] : undefined
     if (arrangement)
       return concaveOverlay(
         fills[ci].concave,
@@ -65,7 +68,7 @@ export function KeyPieceEditor(props: Props) {
       )
     if (hoverConcave != null && fills[hoverConcave]) return concaveOverlay(fills[hoverConcave].concave)
     return showEvidence ? checksOverlay(piece, checks) : null
-  }, [assembly.pieces, previewKey, fills, hoverConcave, showEvidence, piece, checks])
+  }, [assembly.pieces, hoverKey, previewKey, fills, hoverConcave, showEvidence, piece, checks])
   const brush: Brush = erase ? { tool: 'erase' } : { tool: 'paint', kind, dir }
   const uses = assembly.placements.filter((p) => p.pieceId === piece.id).length
 
@@ -117,6 +120,7 @@ export function KeyPieceEditor(props: Props) {
           selected={previewKey}
           onSelect={setPreviewKey}
           onHoverConcave={setHoverConcave}
+          onHoverArrangement={setHoverKey}
           status={fillStatus}
         />
         </div>
