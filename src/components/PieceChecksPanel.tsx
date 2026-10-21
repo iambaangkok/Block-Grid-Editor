@@ -7,7 +7,7 @@ const PILL: Record<CheckStatus, { label: string; cls: string }> = {
   unknown: { label: '?', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+const plural = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`
 
 export function PieceChecksPanel({
   checks,
@@ -43,7 +43,7 @@ export function PieceChecksPanel({
         concave.status === 'na'
           ? 'Needs the two checks above to pass.'
           : concave.status === 'fail'
-            ? `Copies can make the innermost notch solid — ${plural(concave.witness!.copies.length, 'copy')} shown dashed.`
+            ? `Copies can make the innermost notch solid — ${plural(concave.witness!.copies.length, 'copy', 'copies')} shown dashed.`
             : concave.status === 'unknown'
               ? `Search limit reached on ${plural(concave.undecided.length, 'concave')} (outlined).`
               : concave.concaves.length === 0

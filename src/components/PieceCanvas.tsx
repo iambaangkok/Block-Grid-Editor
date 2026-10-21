@@ -18,8 +18,8 @@ export interface PieceOverlay {
   concave?: { x: number; y: number }[]
   /** Its innermost notch (filled). */
   innermost?: { x: number; y: number }[]
-  /** Copies of the piece that fill it — the witness. */
-  ghosts?: Placement[]
+  /** Copies that fill it (a witness or a previewed arrangement), each drawn in its piece's colours. */
+  ghosts?: { piece: KeyPiece; placement: Placement }[]
 }
 
 interface Props {
@@ -57,10 +57,10 @@ export function PieceCanvas({ piece, overlay, brush, onPaint }: Props) {
     deferred: boolean
   } | null>(null)
   const ghostCells = useMemo(
-    () => (overlay?.ghosts ?? []).map((g) => worldCells(piece, g)),
-    [overlay, piece],
+    () => (overlay?.ghosts ?? []).map((g) => ({ piece: g.piece, cells: worldCells(g.piece, g.placement) })),
+    [overlay],
   )
-  const cam = frozen ?? fitView([...piece.cells, ...ghostCells.flat()], w || 1, h || 1)
+  const cam = frozen ?? fitView([...piece.cells, ...ghostCells.flatMap((g) => g.cells)], w || 1, h || 1)
 
   useLayoutEffect(() => {
     const canvas = ref.current
@@ -100,8 +100,13 @@ export function PieceCanvas({ piece, overlay, brush, onPaint }: Props) {
 
     if (overlay) {
       const px = 1 / cam.zoom
-      for (const cells of ghostCells) {
-        drawCells(ctx, cells, { fill: piece.fill, border: piece.border, lineWidth: borderWidth(cam.zoom), alpha: 0.4 })
+      // Concave highlight first, so previewed copies sit on top in their own colours.
+      ctx.save()
+      ctx.fillStyle = 'rgba(253, 126, 20, 0.22)'
+      for (const c of overlay.innermost ?? []) ctx.fillRect(c.x, c.y, 1, 1)
+      ctx.restore()
+      for (const { piece: gp, cells } of ghostCells) {
+        drawCells(ctx, cells, { fill: gp.fill, border: gp.border, lineWidth: borderWidth(cam.zoom), alpha: 0.8 })
         ctx.save()
         ctx.strokeStyle = COLORS.selection
         ctx.setLineDash([4 * px, 3 * px])
@@ -112,8 +117,6 @@ export function PieceCanvas({ piece, overlay, brush, onPaint }: Props) {
         ctx.restore()
       }
       ctx.save()
-      ctx.fillStyle = 'rgba(253, 126, 20, 0.28)'
-      for (const c of overlay.innermost ?? []) ctx.fillRect(c.x, c.y, 1, 1)
       ctx.strokeStyle = '#e8590c'
       ctx.lineWidth = 2 * px
       for (const c of overlay.concave ?? []) ctx.strokeRect(c.x + px, c.y + px, 1 - 2 * px, 1 - 2 * px)

@@ -138,6 +138,14 @@ describe('JSON import/export', () => {
     expect(() => parseImport(JSON.stringify(bad))).toThrow(/unknown kind/)
   })
 
+  it('keeps the filler toggle through save/load and export/import', () => {
+    const ws = starterWorkspace()
+    ws.assemblies[0].pieces[0] = { ...ws.assemblies[0].pieces[0], filler: false }
+    expect(parseStoredWorkspace(JSON.stringify(ws))?.assemblies[0].pieces[0].filler).toBe(false)
+    expect(parseImport(exportWorkspace(ws))[0].pieces[0].filler).toBe(false)
+    expect(parseImport(exportWorkspace(ws))[0].pieces[1].filler).toBeUndefined()
+  })
+
   it('restores persisted state and survives corruption', () => {
     const ws = starterWorkspace()
     expect(parseStoredWorkspace(JSON.stringify(ws))?.assemblies[0].name).toBe('Assembly 1')

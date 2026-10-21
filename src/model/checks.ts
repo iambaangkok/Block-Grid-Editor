@@ -1,6 +1,6 @@
-import { shapesOverlap, isFit, cellKey } from './analysis'
-import { worldCells } from './geometry'
-import type { KeyPiece, Placement, Rot, UnitCell } from './types'
+import { cellKey } from './analysis'
+import { searchFills } from './fill'
+import type { Dir, KeyPiece, Placement } from './types'
 
 // Key-piece validity checks — see CONTEXT.md "Key-piece checks".
 //
@@ -127,6 +127,8 @@ export interface Concave {
   notches: Notch[]
   /** The end backed by the piece — the one that must be filled. */
   innermost: Notch
+  /** Direction the mouth opens towards (away from the backing side). */
+  opens: Dir
 }
 
 /**
@@ -157,13 +159,26 @@ export function findConcaves(cells: readonly XY[]): Concave[] {
           queue.push(m)
         }
       }
-      out.push({ notches: [...stack], innermost: n })
+      // Row notch backed above (+y) opens S; backed below opens N. Column backed on +x opens W.
+      const opens: Dir = n.axis === 'row' ? (side === 1 ? 2 : 0) : side === 1 ? 3 : 1
+      out.push({ notches: [...stack], innermost: n, opens })
     }
   }
-  return out
+  // Stable reading order: top to bottom, then left to right, by the innermost notch.
+  const topLeft = (c: Concave) => {
+    const cs = c.innermost.cells
+    return [-Math.max(...cs.map((q) => q.y)), Math.min(...cs.map((q) => q.x))]
+  }
+  return out.sort((a, b) => {
+    const [ay, ax] = topLeft(a)
+    const [by, bx] = topLeft(b)
+    return ay - by || ax - bx || a.opens - b.opens
+  })
 }
 
 // ── Self-fill search ───────────────────────────────────────────────────────
+
+export { isSolid } from './fill'
 
 export interface FillWitness {
   concave: Concave
@@ -171,119 +186,20 @@ export interface FillWitness {
   copies: Placement[]
 }
 
-const ORIENTATIONS: { rot: Rot; mirror: boolean }[] = []
-for (const mirror of [false, true]) for (const rot of [0, 1, 2, 3] as Rot[]) ORIENTATIONS.push({ rot, mirror })
-
-type Cell = Pick<UnitCell, 'kind' | 'dir'>
-
-/** A square is solid when it holds a block, or a spike with its matching hole seated on it. */
-export function isSolid(occupants: readonly Cell[]): boolean {
-  if (occupants.some((c) => c.kind === 'block')) return true
-  for (let i = 0; i < occupants.length; i++)
-    for (let j = i + 1; j < occupants.length; j++) if (isFit(occupants[i], occupants[j])) return true
-  return false
-}
-
-interface Candidate {
-  placement: Placement
-  cells: { key: string; cell: Cell }[]
-}
-
 export const DEFAULT_SEARCH_BUDGET = 200_000
 
 /**
- * Can copies of `piece` make every square of `concave.innermost` solid, without overlapping the
- * piece or each other (grid overlap rules: only seated spike/hole pairs may share a square)?
- * Returns a witness, null if impossible, or 'unknown' if the search budget ran out.
+ * Can copies of `piece` itself fill `concave`'s innermost notch? Returns a witness, null if
+ * impossible, or 'unknown' if the search budget ran out. Same engine as the fill candidates.
  */
 export function fillConcave(
   piece: KeyPiece,
   concave: Concave,
   budget = DEFAULT_SEARCH_BUDGET,
 ): FillWitness | null | 'unknown' {
-  const target = concave.innermost.cells.map((c) => cellKey(c.x, c.y))
-  const targetSet = new Set(target)
-
-  // Occupancy: the original piece, then copies as they're placed.
-  const occ = new Map<string, Cell[]>()
-  for (const c of piece.cells) occ.set(cellKey(c.x, c.y), [c])
-  const fits = (key: string, cell: Cell) => (occ.get(key) ?? []).every((o) => !shapesOverlap(o, cell))
-
-  // Every copy that matters touches a target square: enumerate orientations × anchoring each
-  // copy cell on each target square, dropping ones that already clash with the piece.
-  const candidates = new Map<string, Candidate>()
-  for (const o of ORIENTATIONS) {
-    const base = worldCells(piece, { id: '', pieceId: piece.id, x: 0, y: 0, ...o })
-    for (const t of concave.innermost.cells) {
-      for (const anchor of base) {
-        const dx = t.x - anchor.x
-        const dy = t.y - anchor.y
-        const cells = base.map((c) => ({ key: cellKey(c.x + dx, c.y + dy), cell: { kind: c.kind, dir: c.dir } }))
-        const sig = cells
-          .map((c) => `${c.key}:${c.cell.kind}:${c.cell.dir}`)
-          .sort()
-          .join('|')
-        if (candidates.has(sig)) continue
-        if (!cells.every((c) => fits(c.key, c.cell))) continue
-        candidates.set(sig, {
-          placement: { id: `copy-${candidates.size}`, pieceId: piece.id, x: dx, y: dy, ...o },
-          cells,
-        })
-      }
-    }
-  }
-  const bySquare = new Map<string, { cand: Candidate; cell: Cell }[]>()
-  for (const cand of candidates.values())
-    for (const c of cand.cells)
-      if (targetSet.has(c.key)) {
-        const list = bySquare.get(c.key) ?? []
-        list.push({ cand, cell: c.cell })
-        bySquare.set(c.key, list)
-      }
-
-  const placed: Candidate[] = []
-  let steps = 0
-  let exhausted = false
-
-  const place = (cand: Candidate) => {
-    for (const c of cand.cells) {
-      const list = occ.get(c.key)
-      if (list) list.push(c.cell)
-      else occ.set(c.key, [c.cell])
-    }
-    placed.push(cand)
-  }
-  const unplace = (cand: Candidate) => {
-    for (const c of cand.cells) {
-      const list = occ.get(c.key)!
-      list.pop()
-      if (list.length === 0) occ.delete(c.key)
-    }
-    placed.pop()
-  }
-
-  const solve = (): boolean => {
-    if (++steps > budget) {
-      exhausted = true
-      return false
-    }
-    const square = target.find((k) => !isSolid(occ.get(k) ?? []))
-    if (!square) return true
-    const here = (occ.get(square) ?? []).filter((c) => c.kind !== 'block')
-    for (const { cand, cell } of bySquare.get(square) ?? []) {
-      // An empty square takes anything; a square with a lone spike/hole needs its exact match.
-      if (here.length > 0 && !here.some((h) => isFit(h, cell))) continue
-      if (!cand.cells.every((c) => fits(c.key, c.cell))) continue
-      place(cand)
-      if (solve()) return true
-      unplace(cand)
-      if (exhausted) return false
-    }
-    return false
-  }
-
-  if (solve()) return { concave, copies: placed.map((c) => c.placement) }
-  return exhausted ? 'unknown' : null
+  const r = searchFills(piece, [piece], concave, { max: 1, budget, probeMore: false })
+  if (r.arrangements.length > 0) return { concave, copies: r.arrangements[0].copies }
+  return r.budgetHit ? 'unknown' : null
 }
 
 // ── All checks for one piece ───────────────────────────────────────────────

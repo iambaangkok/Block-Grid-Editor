@@ -38,6 +38,8 @@ export interface KeyPiece {
   fill: string
   /** Local offsets; at most one cell per (x, y). */
   cells: UnitCell[]
+  /** Offered as a filler when searching fill candidates. Absent = true. */
+  filler?: boolean
 }
 
 export interface Placement {

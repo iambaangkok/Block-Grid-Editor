@@ -77,7 +77,9 @@ function parsePiece(v: unknown, path: string): KeyPiece {
     if (seen.has(k)) fail(path, `two cells at ${k}`)
     seen.add(k)
   }
-  return { id: v.id, name: v.name, fill: v.fill, border: v.border, cells }
+  const piece: KeyPiece = { id: v.id, name: v.name, fill: v.fill, border: v.border, cells }
+  if (v.filler === false) piece.filler = false
+  return piece
 }
 
 function parsePlacement(v: unknown, path: string): Placement {

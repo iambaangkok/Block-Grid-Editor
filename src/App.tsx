@@ -37,7 +37,7 @@ import { assemblyToPng, keyPiecesToPng, type Camera } from './render/draw'
 import { downloadBlob, downloadText, pickFile, slug } from './lib/download'
 import { store, useHistory } from './state/store'
 
-const VERSION = 'v0.2.0'
+const VERSION = 'v0.3.0'
 const DEFAULT_CAMERA: Camera = { x: 0, y: 0, zoom: 36 }
 
 const btn =
@@ -139,6 +139,20 @@ export default function App() {
   const changePiece = (pieceId: string, fn: (p: KeyPiece) => KeyPiece, mergeKey?: string) => {
     if (!asm) return
     commit((w) => updatePiece(w, asm.id, pieceId, fn), { mergeKey })
+  }
+
+  const toggleFiller = (piece: KeyPiece) => {
+    if (!asm) return
+    commit((w) =>
+      updatePiece(w, asm.id, piece.id, (p) => {
+        if (p.filler === false) {
+          const next = { ...p }
+          delete next.filler
+          return next
+        }
+        return { ...p, filler: false }
+      }),
+    )
   }
 
   const startPlacing = (pieceId: string) => {
@@ -494,6 +508,20 @@ export default function App() {
                           {p.cells.length} cell{p.cells.length === 1 ? '' : 's'} · {uses}× placed
                         </span>
                       </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleFiller(p)}
+                      aria-pressed={p.filler !== false}
+                      aria-label={`Use ${p.name || 'piece'} as filler`}
+                      title={p.filler !== false ? 'Used as a filler in fill candidates — click to exclude' : 'Excluded from fill candidates — click to include'}
+                      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
+                        p.filler !== false
+                          ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
+                          : 'border-neutral-200 text-neutral-300 hover:text-neutral-500'
+                      }`}
+                    >
+                      <Icon name={p.filler !== false ? 'key' : 'keyOff'} size={14} />
                     </button>
                     <button
                       type="button"

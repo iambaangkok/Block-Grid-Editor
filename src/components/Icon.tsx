@@ -20,6 +20,8 @@ const PATHS = {
   close: 'M6 6l12 12M18 6 6 18',
   eraser: 'M7 21h13M5 14l9-9 6 6-9 9H8z',
   chevron: 'm6 9 6 6 6-6',
+  key: 'M11 12h10M17 12v3M20 12v2M7 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+  keyOff: 'M11 12h10M17 12v3M20 12v2M7 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM3 3l18 18',
 } as const
 
 export type IconName = keyof typeof PATHS

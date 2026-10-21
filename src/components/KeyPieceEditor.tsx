@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
-import { checkPiece } from '../model/checks'
+import { checkPiece, findConcaves } from '../model/checks'
+import { FILL_CAP_OPTIONS, fillsForPiece, isFiller } from '../model/fill'
 import { isRotatable, rotateDir } from '../model/geometry'
 import { CELL_KINDS, DIR_LABEL, KIND_LABEL, type Assembly, type CellKind, type Dir, type KeyPiece } from '../model/types'
 import { Icon } from './Icon'
 import { CellIcon } from './PieceSvg'
 import { ColorPicker } from './ColorPicker'
 import { PieceCanvas, type Brush } from './PieceCanvas'
-import { checksOverlay } from './checksOverlay'
+import { checksOverlay, concaveOverlay } from './checksOverlay'
+import { FillCandidatesPanel } from './FillCandidatesPanel'
 import { PieceChecksPanel } from './PieceChecksPanel'
 
 interface Props {
@@ -33,7 +35,37 @@ export function KeyPieceEditor(props: Props) {
   const [erase, setErase] = useState(false)
   const [showEvidence, setShowEvidence] = useState(true)
   const checks = useMemo(() => checkPiece(piece), [piece])
-  const overlay = useMemo(() => (showEvidence ? checksOverlay(checks) : null), [checks, showEvidence])
+
+  // ── Fill candidates (live) ──
+  const [cap, setCap] = useFillCap()
+  const [previewKey, setPreviewKey] = useState<string | null>(null)
+  const [hoverConcave, setHoverConcave] = useState<number | null>(null)
+  const shapeOk = checks.connected.status === 'pass' && checks.cavity.status === 'pass'
+  const fills = useMemo(() => {
+    if (!shapeOk || piece.cells.length === 0) return []
+    return fillsForPiece(piece, findConcaves(piece.cells), assembly.pieces.filter(isFiller), cap)
+  }, [shapeOk, piece, assembly.pieces, cap])
+  const fillStatus = !shapeOk
+    ? 'Needs the piece to be edge-connected with no enclosed cavity.'
+    : fills.length === 0
+      ? 'No concaves.'
+      : null
+
+  const overlay = useMemo(() => {
+    const byId = new Map(assembly.pieces.map((p) => [p.id, p]))
+    const [ci, ai] = (previewKey ?? '').split(':').map(Number)
+    const arrangement = previewKey ? fills[ci]?.result.arrangements[ai] : undefined
+    if (arrangement)
+      return concaveOverlay(
+        fills[ci].concave,
+        arrangement.copies.flatMap((placement) => {
+          const p = byId.get(placement.pieceId)
+          return p ? [{ piece: p, placement }] : []
+        }),
+      )
+    if (hoverConcave != null && fills[hoverConcave]) return concaveOverlay(fills[hoverConcave].concave)
+    return showEvidence ? checksOverlay(piece, checks) : null
+  }, [assembly.pieces, previewKey, fills, hoverConcave, showEvidence, piece, checks])
   const brush: Brush = erase ? { tool: 'erase' } : { tool: 'paint', kind, dir }
   const uses = assembly.placements.filter((p) => p.pieceId === piece.id).length
 
@@ -65,6 +97,20 @@ export function KeyPieceEditor(props: Props) {
         </p>
 
         <PieceChecksPanel checks={checks} showEvidence={showEvidence} onShowEvidence={setShowEvidence} />
+
+        <FillCandidatesPanel
+          fills={fills}
+          pieces={assembly.pieces}
+          cap={cap}
+          onCap={(n) => {
+            setCap(n)
+            setPreviewKey(null)
+          }}
+          selected={previewKey}
+          onSelect={setPreviewKey}
+          onHoverConcave={setHoverConcave}
+          status={fillStatus}
+        />
 
         <section>
           <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500">Unit cell</div>
@@ -168,4 +214,23 @@ export function KeyPieceEditor(props: Props) {
       </div>
     </div>
   )
+}
+
+const CAP_KEY = 'block-grid-editor:fill-cap'
+
+/** Arrangements shown per concave (5–20), remembered across sessions. */
+function useFillCap(): [number, (n: number) => void] {
+  const [cap, setCapState] = useState(() => {
+    const n = Number(typeof localStorage === 'undefined' ? NaN : localStorage.getItem(CAP_KEY))
+    return (FILL_CAP_OPTIONS as readonly number[]).includes(n) ? n : FILL_CAP_OPTIONS[0]
+  })
+  const setCap = (n: number) => {
+    setCapState(n)
+    try {
+      localStorage.setItem(CAP_KEY, String(n))
+    } catch {
+      // storage unavailable — keep it for this session only
+    }
+  }
+  return [cap, setCap]
 }

@@ -72,6 +72,31 @@ finite (≤ 8 orientations × piece cells × notch cells); a backtracking search
 budget guards the UI — if hit, the check reports **unknown** instead of guessing. On failure the
 editor shows the concave (orange) and one witness arrangement of copies (dashed).
 
+## Fill candidates
+
+Not a check — a search tool in the Key Piece editor (**Fill candidates** section). Implemented in
+`src/model/fill.ts`; check 3 runs on the same engine.
+
+- For the open key piece (the **target**, fixed in place), for each concave, list the
+  **arrangements** of filler pieces that make every square of its innermost notch solid. Same
+  filling rules as check 3 (static placement, grid overlap rules, solid = block or seated
+  spike/hole pair). Needs the target to be edge-connected with no enclosed cavity.
+- **Fillers**: every key piece in the assembly whose **use as filler** toggle is on (the target
+  included), unlimited copies each, any rotation/mirror. The toggle is saved on the piece as
+  `filler: false` (absent = on), so it persists, exports, and undoes; it's switched with the key
+  icon in the key-pieces list.
+- **Arrangement** = a distinct set of placed copies; ones producing identical cells count once.
+  Only copies with a cell on the innermost notch take part, and each is necessary (a solid square
+  admits nothing else). Listed fewest copies first.
+- **Cap**: 5 arrangements per concave by default, selectable 5 / 10 / 15 / 20 (remembered in
+  localStorage), then "limit reached". A step budget may end the search early — whatever was found
+  is kept and "search limit reached" is shown.
+- **Live**: recomputed when the target, any filler's cells, a toggle, or the cap changes (cached on
+  that geometry, so renames/recolours don't re-run it).
+- Concaves are numbered top-to-bottom, left-to-right by their innermost notch and labelled with the
+  direction their mouth opens. Hovering one outlines it; clicking an arrangement previews its copies
+  on the editor grid in each filler's own colours.
+
 ## Decisions
 
 - Stack: pnpm, Vite, React 19, TypeScript, Tailwind 4, Canvas 2D rendering, vitest, oxlint
