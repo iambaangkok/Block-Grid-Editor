@@ -37,8 +37,28 @@ import { assemblyToPng, keyPiecesToPng, type Camera } from './render/draw'
 import { downloadBlob, downloadText, pickFile, slug } from './lib/download'
 import { store, useHistory } from './state/store'
 
-const VERSION = 'v0.3.0'
+const VERSION = 'v0.3.1'
 const DEFAULT_CAMERA: Camera = { x: 0, y: 0, zoom: 36 }
+
+// Key piece panel width: draggable, remembered across sessions.
+const EDITOR_DEFAULT_WIDTH = 352
+const EDITOR_WIDTH_KEY = 'block-grid-editor:editor-width'
+function clampEditorWidth(w: number) {
+  // Leave room for the assembly canvas on wide screens.
+  const max = Math.max(320, (typeof window === 'undefined' ? 1600 : window.innerWidth) - 320)
+  return Math.round(Math.min(max, Math.max(300, w)))
+}
+function loadEditorWidth() {
+  const n = Number(typeof localStorage === 'undefined' ? NaN : localStorage.getItem(EDITOR_WIDTH_KEY))
+  return Number.isFinite(n) && n > 0 ? clampEditorWidth(n) : EDITOR_DEFAULT_WIDTH
+}
+function saveEditorWidth(w: number) {
+  try {
+    localStorage.setItem(EDITOR_WIDTH_KEY, String(w))
+  } catch {
+    // storage unavailable — width resets next session
+  }
+}
 
 const btn =
   'inline-flex items-center justify-center gap-1 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-white'
@@ -65,6 +85,8 @@ export default function App() {
   const [toast, setToast] = useState<{ text: string; tone: 'info' | 'error' } | null>(null)
   const [leftOpen, setLeftOpen] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
+  const [editorWidth, setEditorWidth] = useState(loadEditorWidth)
+  const resizeStart = useRef<{ x: number; width: number } | null>(null)
 
   const asmId = asm?.id ?? ''
   const camera = cameras[asmId] ?? DEFAULT_CAMERA
@@ -630,7 +652,34 @@ export default function App() {
 
         {/* ── Key piece editor ── */}
         {editingPiece && (
-          <aside className="absolute inset-y-0 right-0 z-10 w-[min(100%,22rem)] border-l border-neutral-200 bg-white shadow-xl md:static md:shadow-none">
+          <aside
+            className="absolute inset-y-0 right-0 z-10 shrink-0 border-l border-neutral-200 bg-white shadow-xl md:relative md:shadow-none"
+            style={{ width: `min(${editorWidth}px, 100%)` }}
+          >
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize key piece panel"
+              title="Drag to resize · double-click to reset"
+              className="absolute inset-y-0 -left-1 z-20 w-2 cursor-col-resize touch-none hover:bg-indigo-300/60 active:bg-indigo-400/60"
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId)
+                resizeStart.current = { x: e.clientX, width: editorWidth }
+              }}
+              onPointerMove={(e) => {
+                if (!resizeStart.current) return
+                setEditorWidth(clampEditorWidth(resizeStart.current.width + resizeStart.current.x - e.clientX))
+              }}
+              onPointerUp={() => {
+                resizeStart.current = null
+                saveEditorWidth(editorWidth)
+              }}
+              onPointerCancel={() => (resizeStart.current = null)}
+              onDoubleClick={() => {
+                setEditorWidth(EDITOR_DEFAULT_WIDTH)
+                saveEditorWidth(EDITOR_DEFAULT_WIDTH)
+              }}
+            />
             <KeyPieceEditor
               key={editingPiece.id}
               piece={editingPiece}

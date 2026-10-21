@@ -53,7 +53,8 @@ export function FillCandidatesPanel({
       {status ? (
         <p className="text-xs text-neutral-500">{status}</p>
       ) : (
-        <ul className="space-y-2.5">
+        // ~10 rows tall with its own scrollbar when stacked; the whole column scrolls when side by side.
+        <ul className="max-h-[13.5rem] space-y-2.5 overflow-y-auto pr-1 @2xl:max-h-none @2xl:overflow-visible">
           {fills.map(({ concave, result }, ci) => (
             <li key={ci} onMouseEnter={() => onHoverConcave(ci)} onMouseLeave={() => onHoverConcave(null)}>
               <div className="text-xs font-medium text-neutral-800">

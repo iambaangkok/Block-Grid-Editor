@@ -84,7 +84,11 @@ export function KeyPieceEditor(props: Props) {
         </button>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-3">
+      {/* Wide panel (≥ 42rem): editing on the left, fill candidates in a sticky right column.
+          Narrow: one column, candidates between the checks and the tools. */}
+      <div className="@container flex-1 overflow-y-auto p-3">
+       <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @2xl:gap-x-5">
+        <div className="min-w-0 space-y-4 @2xl:col-start-1">
         <PieceCanvas
           piece={piece}
           overlay={overlay}
@@ -95,9 +99,13 @@ export function KeyPieceEditor(props: Props) {
           Drag to paint · tap a cell of the same kind to rotate it · right-click or eraser to remove. The dashed cell is the
           piece origin.
         </p>
+        </div>
 
-        <PieceChecksPanel checks={checks} showEvidence={showEvidence} onShowEvidence={setShowEvidence} />
+        <div className="min-w-0 @2xl:col-start-1">
+          <PieceChecksPanel checks={checks} showEvidence={showEvidence} onShowEvidence={setShowEvidence} />
+        </div>
 
+        <div className="min-w-0 self-start @2xl:sticky @2xl:top-0 @2xl:col-start-2 @2xl:row-span-6 @2xl:row-start-1 @2xl:max-h-[calc(100dvh-7rem)] @2xl:overflow-y-auto @2xl:border-l @2xl:border-neutral-200 @2xl:pl-5">
         <FillCandidatesPanel
           fills={fills}
           pieces={assembly.pieces}
@@ -111,8 +119,9 @@ export function KeyPieceEditor(props: Props) {
           onHoverConcave={setHoverConcave}
           status={fillStatus}
         />
+        </div>
 
-        <section>
+        <section className="min-w-0 @2xl:col-start-1">
           <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500">Unit cell</div>
           <div className="flex flex-wrap gap-1.5">
             {CELL_KINDS.map((k) => (
@@ -165,7 +174,7 @@ export function KeyPieceEditor(props: Props) {
           </div>
         </section>
 
-        <section>
+        <section className="min-w-0 @2xl:col-start-1">
           <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500">Whole piece</div>
           <div className="flex flex-wrap gap-1.5">
             <button type="button" className={btn} onClick={() => onTransform(-1, false)}><Icon name="rotCcw" size={13} /> 90°</button>
@@ -175,7 +184,7 @@ export function KeyPieceEditor(props: Props) {
           </div>
         </section>
 
-        <section>
+        <section className="min-w-0 @2xl:col-start-1">
           <ColorPicker
             fill={piece.fill}
             border={piece.border}
@@ -183,7 +192,7 @@ export function KeyPieceEditor(props: Props) {
           />
         </section>
 
-        <section className="space-y-2 border-t border-neutral-200 pt-3">
+        <section className="min-w-0 space-y-2 border-t border-neutral-200 pt-3 @2xl:col-start-1">
           <div className="text-xs text-neutral-500">
             {piece.cells.length} cell{piece.cells.length === 1 ? '' : 's'} · placed {uses}×
           </div>
@@ -211,6 +220,7 @@ export function KeyPieceEditor(props: Props) {
             </button>
           </div>
         </section>
+       </div>
       </div>
     </div>
   )
