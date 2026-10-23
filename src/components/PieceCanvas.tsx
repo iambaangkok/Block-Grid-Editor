@@ -18,6 +18,8 @@ export interface PieceOverlay {
   concave?: { x: number; y: number }[]
   /** Its innermost notch (filled). */
   innermost?: { x: number; y: number }[]
+  /** A concave that gets stuck (look-ahead dead end), outlined in red. */
+  dead?: { x: number; y: number }[]
   /** Copies that fill it (a witness or a previewed arrangement), each drawn in its piece's colours. */
   ghosts?: { piece: KeyPiece; placement: Placement }[]
 }
@@ -120,6 +122,15 @@ export function PieceCanvas({ piece, overlay, brush, onPaint }: Props) {
       ctx.strokeStyle = '#e8590c'
       ctx.lineWidth = 2 * px
       for (const c of overlay.concave ?? []) ctx.strokeRect(c.x + px, c.y + px, 1 - 2 * px, 1 - 2 * px)
+      ctx.save()
+      ctx.strokeStyle = COLORS.conflict
+      ctx.fillStyle = 'rgba(224, 49, 49, 0.12)'
+      ctx.setLineDash([3 * px, 2 * px])
+      for (const c of overlay.dead ?? []) {
+        ctx.fillRect(c.x, c.y, 1, 1)
+        ctx.strokeRect(c.x + 1.5 * px, c.y + 1.5 * px, 1 - 3 * px, 1 - 3 * px)
+      }
+      ctx.restore()
       ctx.fillStyle = 'rgba(224, 49, 49, 0.3)'
       ctx.strokeStyle = COLORS.conflict
       for (const c of overlay.bad ?? []) {

@@ -114,6 +114,44 @@ Not a check — a search tool in the Key Piece editor (**Fill candidates** secti
   direction their mouth opens. Hovering one outlines it; hovering an arrangement previews its copies
   on the editor grid in each filler's own colours, and clicking pins that preview.
 
+## Look-ahead (dead-end elimination)
+
+On-demand filter for the Fill candidates list. Originally proposed as a one-step check, with
+reference source kept locally in `.scratch/` (not committed); generalised here. Her Assembly 2
+pieces are the regression fixture `src/model/fixtures/assembly2.json`. Implemented in
+`src/model/lookahead.ts`, run in a Web Worker (`src/workers/lookahead.worker.ts`).
+
+- **Run on demand**: a **Look-ahead** control (1 / 2 / 3 steps, default 1, remembered in
+  localStorage) with a **Run** button in the Fill candidates section. Runs in the background with
+  progress and **Cancel**; the editor stays usable. Notice shown: it may take a while, and the real
+  puzzle might need more steps, but deeper searches take a long time, so it is limited to 3.
+- **Merged shape**: the target plus a candidate's copies, every cell kept (a square can hold a
+  seated pair or two unseated spikes on different edges).
+- **Survival** *(to confirm with her — Q2)*: after placing the candidate, every **new or changed**
+  concave must have at least one fill that itself survives the remaining steps;
+  `survives(shape, N) = ∀ new/changed concave c ∃ fill f of c: survives(shape + f, N − 1)`,
+  `survives(·, 0) = true`. Concaves are examined one at a time.
+- **New or changed** *(to confirm with her — Q3)*: a concave counts only if no concave with the same
+  notches existed in the shape before that fill. So a concave the target already had (e.g. one
+  nothing can fill) doesn't eliminate candidates for its other concaves.
+- **Eliminated only on proof**: a candidate is a dead end only when the failure is proven. If a
+  sub-search runs out of its step budget (`LOOKAHEAD_BUDGET` = 200 000) or the branching cut-off
+  (`LOOKAHEAD_BRANCH` = 20 fills tried per concave) leaves fills untried, the verdict is **unknown**
+  and the candidate stays, marked `?`. Proven survivors are marked `✓ N`.
+- **Refill**: per concave, candidates are checked fewest copies first until `cap` survivors (✓ or ?)
+  are found or `LOOKAHEAD_CEILING` × cap (5×) have been checked; "limit reached" if more remain.
+- **Eliminated rows** are grouped (struck through) with the first-step culprit, by shape not
+  number: `new concave · opens N · 2 cells: no fill` or `…: every fill dead-ends within k steps`.
+  Hovering previews the candidate and outlines the culprit concave in red.
+- **Out of date**: results are kept after edits to the piece, fillers, toggles, cap or depth but
+  greyed with "Out of date — re-run"; cancelling keeps the previous result.
+- **Scope**: affects the candidates list only — check 3 and the badges are unchanged.
+
+Future improvements (not in v0.4.0):
+- Walk one concrete failing chain for a deep elimination ("fill with X → then this concave has no
+  fill"), stepping through it on the grid.
+- Deeper / unlimited look-ahead (the full "can this piece be closed up" question).
+
 ## Decisions
 
 - Stack: pnpm, Vite, React 19, TypeScript, Tailwind 4, Canvas 2D rendering, vitest, oxlint

@@ -18,7 +18,8 @@ Bump the version on any change to the deployed site, in **two places kept in syn
 
 - `src/model/` — pure domain logic, no React: `types`, `geometry` (rotate/mirror, cell shapes),
   `analysis` (overlap & fit — the base for future interlock analysis), `workspace` (immutable ops),
-  `io` (JSON import/export + validation), `palette`.
+  `io` (JSON import/export + validation), `palette`, `shape` (connectivity, cavities), `checks`,
+  `fill` (fill search), `lookahead` (dead-end elimination; runs in `src/workers/`).
 - `src/state/store.ts` — undo/redo history + localStorage autosave (`commit(fn, { mergeKey })`).
 - `src/render/draw.ts` — Canvas 2D renderer (1 unit = 1 cell, +y up).
 - `src/components/` — React UI (`AssemblyCanvas`, `PieceCanvas`, `KeyPieceEditor`, …).

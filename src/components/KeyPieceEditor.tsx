@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { checkPiece, findConcaves } from '../model/checks'
 import { FILL_CAP_OPTIONS, fillsForPiece, isFiller } from '../model/fill'
+import { LOOKAHEAD_DEPTHS } from '../model/lookahead'
 import { isRotatable, rotateDir } from '../model/geometry'
 import { CELL_KINDS, DIR_LABEL, KIND_LABEL, type Assembly, type CellKind, type Dir, type KeyPiece } from '../model/types'
 import { Icon } from './Icon'
@@ -8,7 +9,8 @@ import { CellIcon } from './PieceSvg'
 import { ColorPicker } from './ColorPicker'
 import { PieceCanvas, type Brush } from './PieceCanvas'
 import { checksOverlay, concaveOverlay } from './checksOverlay'
-import { FillCandidatesPanel } from './FillCandidatesPanel'
+import { FillCandidatesPanel, type FillPreview } from './FillCandidatesPanel'
+import { useLookahead } from './useLookahead'
 import { PieceChecksPanel } from './PieceChecksPanel'
 
 interface Props {
@@ -38,37 +40,53 @@ export function KeyPieceEditor(props: Props) {
 
   // ── Fill candidates (live) ──
   const [cap, setCap] = useFillCap()
-  const [previewKey, setPreviewKey] = useState<string | null>(null)
   const [hoverConcave, setHoverConcave] = useState<number | null>(null)
-  // Hovering an arrangement previews it; clicking pins it so it stays after the pointer leaves.
-  const [hoverKey, setHoverKey] = useState<string | null>(null)
+  // Hovering a row previews it; clicking pins it so it stays after the pointer leaves.
+  const [hoverPreview, setHoverPreview] = useState<FillPreview | null>(null)
+  const [pinnedPreview, setPinnedPreview] = useState<FillPreview | null>(null)
   const shapeOk = checks.connected.status === 'pass' && checks.cavity.status === 'pass'
+  const fillers = useMemo(() => assembly.pieces.filter(isFiller), [assembly.pieces])
   const fills = useMemo(() => {
     if (!shapeOk || piece.cells.length === 0) return []
-    return fillsForPiece(piece, findConcaves(piece.cells), assembly.pieces.filter(isFiller), cap)
-  }, [shapeOk, piece, assembly.pieces, cap])
+    return fillsForPiece(piece, findConcaves(piece.cells), fillers, cap)
+  }, [shapeOk, piece, fillers, cap])
   const fillStatus = !shapeOk
     ? 'Needs the piece to be edge-connected with no enclosed cavity.'
     : fills.length === 0
       ? 'No concaves.'
       : null
 
+  // ── Look-ahead (on demand, in a worker) ──
+  const [depth, setDepth] = useLookaheadDepth()
+  const lookahead = useLookahead()
+  const lookaheadSig = JSON.stringify([piece.cells, fillers.map((f) => [f.id, f.cells]), cap, depth])
+  const runLookahead = () =>
+    lookahead.start({ target: piece, fillers, pieces: assembly.pieces, cap, depth }, lookaheadSig)
+
+  // A pinned preview belongs to the list it came from; drop it when that list changes.
+  const pinnedFor = useRef(fills)
+  useEffect(() => {
+    if (pinnedFor.current !== fills) setPinnedPreview(null)
+    pinnedFor.current = fills
+  }, [fills])
+
   const overlay = useMemo(() => {
     const byId = new Map(assembly.pieces.map((p) => [p.id, p]))
-    const shownKey = hoverKey ?? previewKey
-    const [ci, ai] = (shownKey ?? '').split(':').map(Number)
-    const arrangement = shownKey ? fills[ci]?.result.arrangements[ai] : undefined
-    if (arrangement)
-      return concaveOverlay(
-        fills[ci].concave,
-        arrangement.copies.flatMap((placement) => {
+    const shown = hoverPreview ?? pinnedPreview
+    if (shown) {
+      const o = concaveOverlay(
+        shown.concave,
+        shown.copies.flatMap((placement) => {
           const p = byId.get(placement.pieceId)
           return p ? [{ piece: p, placement }] : []
         }),
       )
+      if (shown.dead) o.dead = shown.dead.notches.flatMap((n) => n.cells)
+      return o
+    }
     if (hoverConcave != null && fills[hoverConcave]) return concaveOverlay(fills[hoverConcave].concave)
     return showEvidence ? checksOverlay(piece, checks) : null
-  }, [assembly.pieces, hoverKey, previewKey, fills, hoverConcave, showEvidence, piece, checks])
+  }, [assembly.pieces, hoverPreview, pinnedPreview, fills, hoverConcave, showEvidence, piece, checks])
   const brush: Brush = erase ? { tool: 'erase' } : { tool: 'paint', kind, dir }
   const uses = assembly.placements.filter((p) => p.pieceId === piece.id).length
 
@@ -115,12 +133,20 @@ export function KeyPieceEditor(props: Props) {
           cap={cap}
           onCap={(n) => {
             setCap(n)
-            setPreviewKey(null)
+            setPinnedPreview(null)
           }}
-          selected={previewKey}
-          onSelect={setPreviewKey}
+          selectedKey={pinnedPreview?.key ?? null}
+          onSelect={setPinnedPreview}
+          onHover={setHoverPreview}
           onHoverConcave={setHoverConcave}
-          onHoverArrangement={setHoverKey}
+          lookahead={{
+            state: lookahead.state,
+            depth,
+            onDepth: setDepth,
+            onRun: runLookahead,
+            onCancel: lookahead.cancel,
+            stale: !!lookahead.state.result && lookahead.state.result.sig !== lookaheadSig,
+          }}
           status={fillStatus}
         />
         </div>
@@ -247,4 +273,23 @@ function useFillCap(): [number, (n: number) => void] {
     }
   }
   return [cap, setCap]
+}
+
+const DEPTH_KEY = 'block-grid-editor:lookahead-depth'
+
+/** Look-ahead steps (1–3), remembered across sessions. */
+function useLookaheadDepth(): [number, (n: number) => void] {
+  const [depth, setDepthState] = useState(() => {
+    const n = Number(typeof localStorage === 'undefined' ? NaN : localStorage.getItem(DEPTH_KEY))
+    return (LOOKAHEAD_DEPTHS as readonly number[]).includes(n) ? n : LOOKAHEAD_DEPTHS[0]
+  })
+  const setDepth = (n: number) => {
+    setDepthState(n)
+    try {
+      localStorage.setItem(DEPTH_KEY, String(n))
+    } catch {
+      // storage unavailable — keep it for this session only
+    }
+  }
+  return [depth, setDepth]
 }

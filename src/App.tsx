@@ -37,7 +37,7 @@ import { assemblyToPng, keyPiecesToPng, type Camera } from './render/draw'
 import { downloadBlob, downloadText, pickFile, slug } from './lib/download'
 import { store, useHistory } from './state/store'
 
-const VERSION = 'v0.3.4'
+const VERSION = 'v0.4.0'
 const DEFAULT_CAMERA: Camera = { x: 0, y: 0, zoom: 36 }
 
 // Key piece panel width: draggable, remembered across sessions.

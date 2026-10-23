@@ -18,5 +18,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    // .scratch holds reference material (e.g. proposed source), not part of the suite.
+    exclude: ['**/node_modules/**', '**/dist/**', '.scratch/**'],
   },
 })
